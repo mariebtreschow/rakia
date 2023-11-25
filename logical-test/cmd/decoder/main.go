@@ -3,24 +3,89 @@ package main
 import (
 	"flag"
 	"fmt"
+	"strconv"
 )
 
-// Decoder takes an integer and returns the corresponding letter in the alphabet
-// starting with A=1, B=2, C=3, etc.
-// If the integer is less than 1 or greater than 26, an error is returned.
+// decoder takes an integer and returns the corresponding letter in the alphabet
+// curring with A=1, B=2, C=3, etc.
+// combination of intergers is based on sequence of the letters
+// 1 -> A
+// 12 -> AB, L
+// 226 -> BBF, BZ, VF
+// 2269 -> BBFI, BZI, VFI, VZ
+// if the integer is less than 1 or greater than 26, an error is returned.
 
 type Decoder struct {
-	intergers int
 }
 
-func (*Decoder) Decode(intergers int) (string, error) {
-	fmt.Printf("decoding intergers: %v to a string\n", intergers)
+func (D *Decoder) stringNumbersToLetter(s string) (string, error) {
+	num, err := strconv.Atoi(s)
+	if err != nil {
+		return "", err
+	}
+	if num < 1 || num > 26 {
+		return "", fmt.Errorf("number out of range")
+	}
+	// 'A' is 65 in ASCII, so we add n-1 to it to get the correct letter
+	return string('A' + num - 1), nil
+}
 
-	if intergers < 1 {
-		return "", fmt.Errorf("invalid input")
+func (D *Decoder) decode(digits string, index int, currentLetter string, result *[]string) error {
+	fmt.Println("current digit being decoded:", currentLetter)
+
+	// if index is equal to the length of the digits, we have reached the end of the string
+	// and can append the current letter to the result
+	if index == len(digits) {
+		*result = append(*result, currentLetter)
+		return nil
 	}
 
-	return "A", nil
+	// single digit
+	letter, err := D.stringNumbersToLetter(string(digits[index]))
+	fmt.Println("single letter", letter)
+	if err != nil {
+		return err
+	}
+
+	// recursively call decode with the next index and the current letter
+	err = D.decode(digits, index+1, currentLetter+letter, result)
+	if err != nil {
+		return err
+	}
+
+	// two digits, if valid
+	if index < len(digits)-1 {
+		// current digit and the next digit to an integer
+		merged := string(digits[index]) + string(digits[index+1])
+		digit, err := strconv.Atoi(merged)
+		if err != nil {
+			return err
+		}
+		// need t o convert to an integer and check if the integer is valid
+		if digit <= 26 {
+			// use the string value
+			letter, err := D.stringNumbersToLetter(merged)
+			if err != nil {
+				return err
+			}
+
+			// recursively call decode with the next index and the current letter to add on to the current letter
+			err = D.decode(digits, index+2, currentLetter+letter, result)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (D *Decoder) FindAllCombinations(digits string) ([]string, error) {
+	var result []string
+	err := D.decode(digits, 0, "", &result)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
 }
 
 func NewDecoder() *Decoder {
@@ -28,15 +93,16 @@ func NewDecoder() *Decoder {
 }
 
 func main() {
-	intergers := flag.Int("intergers", 1, "an int")
+	digits := flag.String("digits", "1", "digits to decode")
 	flag.Parse()
 
-	decoder := NewDecoder()
-	result, err := decoder.Decode(*intergers)
+	d := NewDecoder()
+	result, err := d.FindAllCombinations(*digits)
+
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
-	fmt.Printf("Decoded %v to %v\n", *intergers, result)
+	fmt.Printf("Decoded %v to %v\n", *digits, result)
 
 }
