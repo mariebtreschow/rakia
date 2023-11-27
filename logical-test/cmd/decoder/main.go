@@ -42,13 +42,16 @@ func (D *Decoder) decode(digits string, index int, currentLetter string, result 
 
 	// single digit
 	letter, err := D.stringNumbersToLetter(string(digits[index]))
-	fmt.Println("single letter", letter)
+	fmt.Println("1. single letter:", letter)
 	if err != nil {
 		return err
 	}
+	// append letters
+	appendLetters := currentLetter + letter
 
 	// recursively call decode with the next index and the current letter
-	err = D.decode(digits, index+1, currentLetter+letter, result)
+	err = D.decode(digits, index+1, appendLetters, result)
+	fmt.Println("1. recursively call decode with the appened letters:", appendLetters)
 	if err != nil {
 		return err
 	}
@@ -65,12 +68,15 @@ func (D *Decoder) decode(digits string, index int, currentLetter string, result 
 		if digit <= 26 {
 			// use the string value
 			letter, err := D.stringNumbersToLetter(merged)
+			fmt.Println("2. two letters:", merged)
 			if err != nil {
 				return err
 			}
-
+			// append letters
+			appendLetters := currentLetter + letter
 			// recursively call decode with the next index and the current letter to add on to the current letter
-			err = D.decode(digits, index+2, currentLetter+letter, result)
+			err = D.decode(digits, index+2, appendLetters, result)
+			fmt.Println("2. recursively call decode with the appended letters:", appendLetters)
 			if err != nil {
 				return err
 			}
@@ -79,13 +85,19 @@ func (D *Decoder) decode(digits string, index int, currentLetter string, result 
 	return nil
 }
 
-func (D *Decoder) FindAllCombinations(digits string) ([]string, error) {
+func (D *Decoder) FindAllCombinations(digits string) (int, error) {
 	var result []string
+	if digits == "0" {
+		fmt.Println("digits is 0, always return 0")
+		result = append(result, "0")
+		return len(result), nil
+	}
 	err := D.decode(digits, 0, "", &result)
 	if err != nil {
-		return result, err
+		return len(result), err
 	}
-	return result, nil
+	fmt.Println("possible combinations:", result)
+	return len(result), nil
 }
 
 func NewDecoder() *Decoder {
@@ -98,7 +110,6 @@ func main() {
 
 	d := NewDecoder()
 	result, err := d.FindAllCombinations(*digits)
-
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
