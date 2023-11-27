@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -18,11 +17,11 @@ func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
 }
 
 type PostsService interface {
-	CreatePosts(ctx context.Context, post internal.Post) error
-	GetAllPosts(ctx context.Context, author string) ([]internal.Post, error)
-	// GetPosts(ctx context.Context, id int) (string, error)
-	// UpdatePosts(ctx context.Context, post PostRequest) error
-	// DeletePosts(ctx context.Context, id int) error
+	CreatePosts(post internal.Post) error
+	GetAllPosts(author string) ([]*internal.Post, error)
+	UpdatePosts(post internal.Post) error
+	GetPosts(id int, author string) (*internal.Post, error)
+	DeletePosts(id int, author string) error
 }
 
 type AuthorsService interface {

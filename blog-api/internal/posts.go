@@ -1,12 +1,16 @@
 package internal
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
 	"github.com/rs/zerolog"
+)
+
+var (
+	ErrPostNotFound = fmt.Errorf("post not found")
 )
 
 type Post struct {
@@ -17,12 +21,14 @@ type Post struct {
 }
 
 type PostData struct {
-	Data []Post `json:"posts"` // from json file
+	Posts []Post `json:"posts"` // from json file
 }
 
-// store in memory json for a blogpost
+type AuthorPostsMap map[string][]Post
+
+// Store the blogposts from the json file per author
 type Persistence struct {
-	Posts  PostData
+	Posts  AuthorPostsMap
 	logger *zerolog.Logger
 }
 
@@ -33,13 +39,13 @@ func NewPersistance(logger *zerolog.Logger) (*Persistence, error) {
 		return nil, err
 	}
 	return &Persistence{
-		Posts:  *blogPosts,
+		Posts:  blogPosts,
 		logger: logger,
 	}, nil
 }
 
 // seed the blogposts slice with data from the json file in resources/blog_data.json
-func getPostsFromFile() (*PostData, error) {
+func getPostsFromFile() (map[string][]Post, error) {
 	// Open the JSON file
 	jsonFile, err := os.Open(FILEPATH)
 	if err != nil {
@@ -53,34 +59,80 @@ func getPostsFromFile() (*PostData, error) {
 		return nil, err
 	}
 
-	// Define a variable to hold the data from the JSON file
-	var posts PostData
-
+	var data PostData
 	// Unmarshal the JSON data into the posts slice
-	if err := json.Unmarshal(byteValue, &posts); err != nil {
+	if err := json.Unmarshal(byteValue, &data); err != nil {
 		return nil, err
 	}
-	return &posts, nil
+
+	// Define a variable to hold the data from the JSON file
+	authorPosts := make(AuthorPostsMap)
+
+	for _, post := range data.Posts {
+		fmt.Println(post)
+		authorPosts[post.Author] = append(authorPosts[post.Author], post)
+	}
+
+	return authorPosts, nil
 }
 
 // CreatePosts creates a new blogpost
-func (p *Persistence) CreatePosts(ctx context.Context, post Post) error {
+func (p *Persistence) CreatePosts(post Post) error {
 	// Add the post to the posts slice
-	p.Posts.Data = append(p.Posts.Data, post)
 
 	return nil
 }
 
 // Get all posts for the author
-func (p *Persistence) GetAllPosts(ctx context.Context, author string) ([]Post, error) {
+func (p *Persistence) GetAllPosts(author string) ([]*Post, error) {
 	// Get all posts for the author
-	var posts []Post
+	posts := p.Posts[author]
 
-	// Ok to use range here because the number of posts will be small
-	for _, post := range p.Posts.Data {
-		if post.Author == author {
-			posts = append(posts, post)
+	// Create a slice of pointers to the posts
+	postPointers := make([]*Post, len(posts))
+	for i := range posts {
+		postPointers[i] = &posts[i]
+	}
+
+	return postPointers, nil
+}
+
+// GetPosts gets a blogpost by id
+func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
+	// Get post for the author
+	posts := p.Posts[author]
+	for i := range posts {
+		if posts[i].ID == id {
+			return &posts[i], nil
 		}
 	}
-	return posts, nil
+	return nil, ErrPostNotFound
+}
+
+// UpdatePosts updates a blogpost
+func (p *Persistence) UpdatePosts(post Post) error {
+	// Update the post in the posts slice
+	posts := p.Posts[post.Author]
+	for i := range posts {
+		if posts[i].ID == post.ID {
+			posts[i] = post
+		}
+	}
+	return ErrPostNotFound
+
+}
+
+// DeletePosts deletes a blogpost
+func (p *Persistence) DeletePosts(id int, author string) error {
+	// Delete the post from the posts slice
+
+	posts := p.Posts[author]
+	for i := range posts {
+		if posts[i].ID == id {
+			// Delete the post from the posts slice
+			posts = append(posts[:i], posts[i+1:]...)
+			return nil
+		}
+	}
+	return ErrPostNotFound
 }
