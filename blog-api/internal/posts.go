@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/rs/zerolog"
 )
 
 var (
 	ErrPostNotFound = fmt.Errorf("post not found")
+	ErrUniqueTitle  = fmt.Errorf("title must be unique")
 )
 
 type Post struct {
@@ -25,10 +27,13 @@ type PostData struct {
 }
 
 type AuthorPostsMap map[string][]Post
+type AuthorLastIDMap map[string]int
 
 // Store the blogposts from the json file per author
 type Persistence struct {
 	Posts  AuthorPostsMap
+	LastID AuthorLastIDMap
+	mutex  sync.Mutex // Protects access to lastID and Posts
 	logger *zerolog.Logger
 }
 
@@ -38,8 +43,15 @@ func NewPersistance(logger *zerolog.Logger) (*Persistence, error) {
 		logger.Fatal().Err(err).Msg("error getting blog posts from file")
 		return nil, err
 	}
+
+	lastID := make(AuthorLastIDMap)
+	for author, posts := range blogPosts {
+		lastID[author] = posts[len(posts)-1].ID
+	}
+
 	return &Persistence{
 		Posts:  blogPosts,
+		LastID: lastID,
 		logger: logger,
 	}, nil
 }
@@ -69,7 +81,6 @@ func getPostsFromFile() (map[string][]Post, error) {
 	authorPosts := make(AuthorPostsMap)
 
 	for _, post := range data.Posts {
-		fmt.Println(post)
 		authorPosts[post.Author] = append(authorPosts[post.Author], post)
 	}
 
@@ -78,7 +89,18 @@ func getPostsFromFile() (map[string][]Post, error) {
 
 // CreatePosts creates a new blogpost
 func (p *Persistence) CreatePosts(post Post) error {
-	// Add the post to the posts slice
+	// ID and Title must be unique
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	for _, existingPost := range p.Posts[post.Author] {
+		if existingPost.Title == post.Title {
+			return ErrUniqueTitle
+		}
+	}
+	// Add ID, must be unique
+	post.ID = p.LastID[post.Author] + 1
+	p.Posts[post.Author] = append(p.Posts[post.Author], post)
 
 	return nil
 }
@@ -110,12 +132,16 @@ func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
 }
 
 // UpdatePosts updates a blogpost
-func (p *Persistence) UpdatePosts(post Post) error {
+func (p *Persistence) UpdatePosts(post Post, author string) error {
 	// Update the post in the posts slice
-	posts := p.Posts[post.Author]
+	posts := p.Posts[author]
+	fmt.Println(posts)
 	for i := range posts {
-		if posts[i].ID == post.ID {
+		// make sure the post belongs to the author
+		fmt.Println(posts[i].ID, post.ID, posts[i].Author, author)
+		if posts[i].ID == post.ID && posts[i].Author == author {
 			posts[i] = post
+			return nil
 		}
 	}
 	return ErrPostNotFound
