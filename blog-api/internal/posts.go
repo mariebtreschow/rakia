@@ -5,14 +5,23 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/rs/zerolog"
 )
 
 var (
-	ErrPostNotFound = fmt.Errorf("post not found")
-	ErrUniqueTitle  = fmt.Errorf("title must be unique")
+	ErrPostNotFound      = fmt.Errorf("post not found")
+	ErrContentEmpty      = fmt.Errorf("content must not be empty")
+	ErrContentInvalid    = fmt.Errorf("content must not be longer than 1600 characters or shorter than 100")
+	ErrContentEncoding   = fmt.Errorf("content must be valid UTF-8")
+	ErrUniqueTitle       = fmt.Errorf("title must be unique")
+	ErrTitleEmpty        = fmt.Errorf("title must not be empty")
+	ErrTitleInvalid      = fmt.Errorf("title must not be longer than 50 characters or shorter than 5 characters")
+	ErrTitleInvalidChars = fmt.Errorf("title must not contain special characters")
+	ErrAuthorEmpty       = fmt.Errorf("author must not be empty")
 )
 
 type Post struct {
@@ -27,6 +36,7 @@ type PostData struct {
 }
 
 type AuthorPostsMap map[string][]Post
+
 type AuthorLastIDMap map[string]int
 
 // Store the blogposts from the json file per author
@@ -38,25 +48,34 @@ type Persistence struct {
 }
 
 func NewPersistance(logger *zerolog.Logger) (*Persistence, error) {
-	blogPosts, err := getPostsFromFile()
-	if err != nil {
-		logger.Fatal().Err(err).Msg("error getting blog posts from file")
-		return nil, err
-	}
-
-	lastID := make(AuthorLastIDMap)
-	for author, posts := range blogPosts {
-		lastID[author] = posts[len(posts)-1].ID
-	}
-
 	return &Persistence{
-		Posts:  blogPosts,
-		LastID: lastID,
+		Posts:  make(AuthorPostsMap),
+		LastID: make(AuthorLastIDMap),
 		logger: logger,
 	}, nil
 }
 
-// seed the blogposts slice with data from the json file in resources/blog_data.json
+func (p *Persistence) Seed() {
+	// Add the authors from the json file in the resources folder to the authors slice
+	authors, err := getAuthors()
+	if err != nil {
+		p.logger.Fatal().Err(err).Msg("error getting authors from file")
+		return
+	}
+	for _, author := range authors {
+		// Add the posts from the json file in the resources folder to the posts slice
+		posts, err := getPostsFromFile()
+
+		if err != nil {
+			p.logger.Fatal().Err(err).Msg("error getting posts from file")
+			return
+		}
+		p.Posts[author.Author] = posts[author.Author]
+		p.LastID[author.Author] = posts[author.Author][len(posts[author.Author])-1].ID
+	}
+}
+
+// Add the blogposts from the json file in the resources folder to the posts slice
 func getPostsFromFile() (map[string][]Post, error) {
 	// Open the JSON file
 	jsonFile, err := os.Open(FILEPATH)
@@ -80,26 +99,99 @@ func getPostsFromFile() (map[string][]Post, error) {
 	// Define a variable to hold the data from the JSON file
 	authorPosts := make(AuthorPostsMap)
 
+	// Add the posts to the posts slice
 	for _, post := range data.Posts {
+		if validateContent(post.Content) != nil {
+			return nil, err
+		}
+		if validateTitle(post.Title) != nil {
+			return nil, err
+		}
+		if validateAuthor(post.Author) != nil {
+			return nil, err
+		}
 		authorPosts[post.Author] = append(authorPosts[post.Author], post)
 	}
-
 	return authorPosts, nil
+}
+
+func validateTitle(title string) error {
+	if title == "" {
+		return ErrTitleEmpty
+	}
+
+	if len(title) > 60 || len(title) < 5 {
+		return ErrTitleInvalid
+	}
+
+	// Check for unwanted special characters
+	// This regular expression allows letters, numbers, spaces, hyphens, and underscores
+	matched, err := regexp.MatchString("^[a-zA-Z0-9\\-\\_\\s]+$", title)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return ErrTitleInvalidChars
+	}
+	return nil
+}
+
+func validateContent(content string) error {
+	if content == "" {
+		return ErrContentEmpty
+	}
+	if len(content) > 1600 || len(content) < 100 {
+		return ErrContentInvalid
+	}
+	// Check for proper UTF-8 encoding
+	if !utf8.ValidString(content) {
+		return ErrContentEncoding
+	}
+	return nil
+}
+
+func validateAuthor(author string) error {
+	if author == "" {
+		return ErrAuthorEmpty
+	}
+	return nil
 }
 
 // CreatePosts creates a new blogpost
 func (p *Persistence) CreatePosts(post Post) error {
-	// ID and Title must be unique
+	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	// Check if the title is unique
 	for _, existingPost := range p.Posts[post.Author] {
 		if existingPost.Title == post.Title {
 			return ErrUniqueTitle
 		}
 	}
+
+	// Validate the post
+	errTitle := validateTitle(post.Title)
+	if errTitle != nil {
+		return errTitle
+	}
+
+	errContent := validateContent(post.Content)
+	if errContent != nil {
+		return errContent
+	}
+
+	errAuthor := validateAuthor(post.Author)
+	if errAuthor != nil {
+		return errAuthor
+	}
+
 	// Add ID, must be unique
 	post.ID = p.LastID[post.Author] + 1
+	// Increment the lastID
+	p.LastID[post.Author] = post.ID
+
+	// Add the post to the posts slice
 	p.Posts[post.Author] = append(p.Posts[post.Author], post)
 
 	return nil
@@ -121,7 +213,7 @@ func (p *Persistence) GetAllPosts(author string) ([]*Post, error) {
 
 // GetPosts gets a blogpost by id
 func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
-	// Get post for the author
+	// Get all posts for the author
 	posts := p.Posts[author]
 	for i := range posts {
 		if posts[i].ID == id {
@@ -132,30 +224,43 @@ func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
 }
 
 // UpdatePosts updates a blogpost
-func (p *Persistence) UpdatePosts(post Post, author string) error {
-	// Update the post in the posts slice
-	posts := p.Posts[author]
-	fmt.Println(posts)
+func (p *Persistence) UpdatePosts(post Post) error {
+	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	// Validate the post
+	errTitle := validateTitle(post.Title)
+	if errTitle != nil {
+		return errTitle
+	}
+
+	errContent := validateContent(post.Content)
+	if errContent != nil {
+		return errContent
+	}
+
+	errAuthor := validateAuthor(post.Author)
+	if errAuthor != nil {
+		return errAuthor
+	}
+	posts := p.Posts[post.Author]
 	for i := range posts {
-		// make sure the post belongs to the author
-		fmt.Println(posts[i].ID, post.ID, posts[i].Author, author)
-		if posts[i].ID == post.ID && posts[i].Author == author {
+		// Make sure the post belongs to the author
+		if posts[i].ID == post.ID && posts[i].Author == post.Author {
 			posts[i] = post
 			return nil
 		}
 	}
 	return ErrPostNotFound
-
 }
 
 // DeletePosts deletes a blogpost
 func (p *Persistence) DeletePosts(id int, author string) error {
 	// Delete the post from the posts slice
-
 	posts := p.Posts[author]
 	for i := range posts {
 		if posts[i].ID == id {
-			// Delete the post from the posts slice
 			posts = append(posts[:i], posts[i+1:]...)
 			return nil
 		}

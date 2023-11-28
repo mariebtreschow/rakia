@@ -9,8 +9,11 @@ import (
 	"rakia.ai/blog-api/v2/internal"
 )
 
-// JWT Secret Key (should be kept secret and preferably not hardcoded)
+// JWT Secret Key (should be kept secret and preferably not hardcoded, this is just for demo purposes)
 var jwtKey = []byte("my_secret_key")
+
+// JWT Expiration Time (30 minutes)
+var expirationTime = time.Now().Add(time.Minute * 30)
 
 // Claims struct for JWT
 type Claims struct {
@@ -29,24 +32,23 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		// Decode the incoming JSON payload
 		err := json.NewDecoder(r.Body).Decode(&credentials)
 		if err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			writeJSONError(w, "invalid request payload", http.StatusBadRequest)
 			return
 		}
 
 		// Validate the author's credentials
 		valid, err := s.AuthorsService.ValidAuthor(credentials.Author, credentials.Password)
 		if err != nil {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			writeJSONError(w, "invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
 		if !valid {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			writeJSONError(w, "invalid credentials", http.StatusUnauthorized)
 			return
 		}
 
 		// Create the JWT claims, which includes the username and expiry time
-		expirationTime := time.Now().Add(30 * time.Minute)
 		claims := &Claims{
 			Username: credentials.Author,
 			StandardClaims: jwt.StandardClaims{
@@ -61,7 +63,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		// Create the JWT string
 		tokenString, err := token.SignedString(jwtKey)
 		if err != nil {
-			http.Error(w, "Failed to create token", http.StatusInternalServerError)
+			writeJSONError(w, "failed to create token", http.StatusInternalServerError)
 			return
 		}
 
@@ -73,7 +75,7 @@ func (s *Server) LoginHandler() http.HandlerFunc {
 		// Marshal the response object to JSON
 		jsonResponse, err := json.Marshal(response)
 		if err != nil {
-			http.Error(w, "Failed to create response", http.StatusInternalServerError)
+			writeJSONError(w, "failed to marshal response", http.StatusInternalServerError)
 			return
 		}
 

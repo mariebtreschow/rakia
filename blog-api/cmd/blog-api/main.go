@@ -16,11 +16,11 @@ import (
 )
 
 func main() {
-
 	fs := flag.NewFlagSet("blog_api", flag.ExitOnError)
 
 	var (
-		listenPort = fs.String("port", "8080", "Port to listen on")
+		listenPort = fs.String("port", "8080", "port to listen on")
+		wait       = fs.Duration("graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
 	)
 
 	fs.Parse(os.Args[1:])
@@ -32,8 +32,11 @@ func main() {
 	logger.Info().Msg("seeding blog posts")
 	posts, err := internal.NewPersistance(logger)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("error seeding blog posts")
+		logger.Fatal().Err(err).Msg("error creating blog posts service")
 	}
+
+	// Seed the blog posts
+	posts.Seed()
 
 	// Create a new author service
 	logger.Info().Msg("creating author service")
@@ -58,23 +61,22 @@ func main() {
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
-		Handler:      s.Router, // Assuming s.Router is your mux router
+		Handler:      s.Router,
 	}
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
 	logger.Info().Msgf("starting server on port: %s", *listenPort)
-
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Err(err).Msg("ListenAndServe failed")
 		}
 	}()
 
-	<-done // Wait for interrupt signal to gracefully shutdown the server
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	<-c // Wait for interrupt signal to gracefully shutdown the server
+
+	ctx, cancel := context.WithTimeout(context.Background(), *wait)
 	defer cancel()
 
 	logger.Info().Msg("shutting down server")
@@ -82,5 +84,5 @@ func main() {
 		logger.Err(err).Msg("server shutdown failed")
 	}
 	logger.Info().Msg("server exited properly")
-
+	os.Exit(0)
 }

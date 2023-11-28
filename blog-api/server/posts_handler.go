@@ -9,6 +9,8 @@ import (
 	"rakia.ai/blog-api/v2/internal"
 )
 
+var ErrInvalidRequest = "unable to process request due to invalid information"
+
 type PostCreate struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
@@ -19,6 +21,7 @@ type PostUpdate struct {
 	ID      int    `json:"id"`
 	Title   string `json:"title"`
 	Content string `json:"content"`
+	Author  string `json:"author"`
 }
 
 type PostResponse struct {
@@ -33,29 +36,36 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
-			http.Error(w, "error getting author from context", http.StatusInternalServerError)
+			s.Logger.Error().Msg("error getting author from context")
+			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
 
 		// Get all posts for the author
 		posts, err := s.PostsService.GetAllPosts(author)
 		if err != nil {
+			s.Logger.Error().Err(err).Msg("error getting posts")
 			writeJSONError(w, "error getting posts", http.StatusInternalServerError)
 			return
 		}
 		if len(posts) == 0 {
+			s.Logger.Error().Msg("no posts found")
 			writeJSONError(w, "no posts found", http.StatusNotFound)
 			return
 		}
 
-		// Write the posts to the response
+		// JSON encode the posts
 		jsonResponse, err := json.Marshal(posts)
 		if err != nil {
-			writeJSONError(w, "error marshalling posts", http.StatusInternalServerError)
+			s.Logger.Error().Err(err).Msg("error marshalling posts")
+			writeJSONError(w, "error getting posts", http.StatusInternalServerError)
 			return
 		}
 
+		// Set the content-type header to json
 		w.Header().Set("Content-Type", "application/json")
+
+		// Send the response
 		w.Write(jsonResponse)
 
 	}
@@ -68,7 +78,7 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
 			s.Logger.Error().Msg("error getting author from context")
-			writeJSONError(w, "error getting author from context", http.StatusInternalServerError)
+			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
 
@@ -100,7 +110,7 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 			return
 		}
 
-		// return the post
+		// JSON encode the post
 		jsonResponse, err := json.Marshal(post)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error marshalling post")
@@ -108,7 +118,10 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 			return
 		}
 
+		// Set the content-type header to json
 		w.Header().Set("Content-Type", "application/json")
+
+		// Send the response
 		w.Write(jsonResponse)
 
 	}
@@ -116,18 +129,18 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 
 func (s *Server) CreatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// validate incoming post
+		// Get the context from the request
+		author, ok := r.Context().Value(ContextAuthor).(string)
+		if !ok {
+			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
+			return
+		}
+
+		// Validate incoming post
 		var postRequest PostCreate
 		err := json.NewDecoder(r.Body).Decode(&postRequest)
 		if err != nil {
 			writeJSONError(w, "invalid request payload", http.StatusBadRequest)
-			return
-		}
-
-		// Get the context from the request
-		author, ok := r.Context().Value(ContextAuthor).(string)
-		if !ok {
-			writeJSONError(w, "error getting author from context", http.StatusInternalServerError)
 			return
 		}
 
@@ -143,8 +156,9 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 		// Save the post
 		err = s.PostsService.CreatePosts(post)
 		if err != nil {
-			if err == internal.ErrUniqueTitle {
-				writeJSONError(w, "title already exists", http.StatusBadRequest)
+			// Handle validation errors
+			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {
+				writeJSONError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 			writeJSONError(w, err.Error(), http.StatusInternalServerError)
@@ -163,7 +177,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
-			writeJSONError(w, "error getting author from context", http.StatusInternalServerError)
+			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
 
@@ -182,7 +196,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 			return
 		}
 
-		// validate incoming post
+		// Validate incoming post
 		var postRequest PostUpdate
 		err = json.NewDecoder(r.Body).Decode(&postRequest)
 		if err != nil {
@@ -192,23 +206,38 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		}
 
 		if postID != postRequest.ID {
+			s.Logger.Error().Msg("mismatching ids in request and url")
 			writeJSONError(w, "mismatching ids in request and url", http.StatusBadRequest)
 			return
 		}
 
+		if postRequest.Author != author {
+			s.Logger.Error().Msg("mismatching authors in request and url")
+			writeJSONError(w, "not allowed to update posts for unautheticated author", http.StatusBadRequest)
+			return
+		}
 		var post internal.Post
+
 		// Update the post
 		post.ID = postRequest.ID // Not being update buy used to find the post
 		post.Title = postRequest.Title
 		post.Content = postRequest.Content
+		post.Author = postRequest.Author
 
-		// Save the post
-		err = s.PostsService.UpdatePosts(post, author)
+		// Save the updated post
+		err = s.PostsService.UpdatePosts(post)
 		if err != nil {
+			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {
+				s.Logger.Error().Err(err).Msg("error updating post")
+				writeJSONError(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			if err == internal.ErrPostNotFound {
+				s.Logger.Error().Err(err).Msg("post not found")
 				writeJSONError(w, "post not found", http.StatusNotFound)
 				return
 			}
+			s.Logger.Error().Err(err).Msg("error updating post")
 			writeJSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -225,13 +254,15 @@ func (s *Server) DeletePostsHandler() http.HandlerFunc {
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
-			writeJSONError(w, "error getting author from context", http.StatusInternalServerError)
+			s.Logger.Error().Msg("error getting author from context")
+			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
 
 		// Get the post ID from the URL
 		id, ok := mux.Vars(r)["id"]
 		if !ok {
+			s.Logger.Error().Msg("missing post id")
 			writeJSONError(w, "missing post id", http.StatusBadRequest)
 			return
 		}
@@ -239,6 +270,7 @@ func (s *Server) DeletePostsHandler() http.HandlerFunc {
 		// Convert the post ID from string to int
 		postID, err := strconv.Atoi(id)
 		if err != nil {
+			s.Logger.Error().Err(err).Msg("invalid post id")
 			writeJSONError(w, "invalid post id", http.StatusBadRequest)
 			return
 		}
@@ -247,9 +279,11 @@ func (s *Server) DeletePostsHandler() http.HandlerFunc {
 		err = s.PostsService.DeletePosts(postID, author)
 		if err != nil {
 			if err == internal.ErrPostNotFound {
+				s.Logger.Error().Err(err).Msg("post not found")
 				writeJSONError(w, "post not found", http.StatusNotFound)
 				return
 			}
+			s.Logger.Error().Err(err).Msg("error deleting post")
 			writeJSONError(w, "error deleting post", http.StatusInternalServerError)
 			return
 		}

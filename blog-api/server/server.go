@@ -19,7 +19,7 @@ func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
 type PostsService interface {
 	CreatePosts(post internal.Post) error
 	GetAllPosts(author string) ([]*internal.Post, error)
-	UpdatePosts(post internal.Post, author string) error
+	UpdatePosts(post internal.Post) error
 	GetPosts(id int, author string) (*internal.Post, error)
 	DeletePosts(id int, author string) error
 }
@@ -59,10 +59,15 @@ func (s *Server) Routes() {
 	// Authenticated routes
 	api.Use(Middleware(*s.Logger))
 
+	// Create a new post for an author
 	api.HandleFunc("/posts", s.CreatePostsHandler()).Methods("POST")
+	// Get one post for an author
 	api.HandleFunc("/posts/{id}", s.GetPostsHandler()).Methods("GET")
+	// Get all posts for an author
 	api.HandleFunc("/posts", s.GetAllPostsHandler()).Methods("GET")
+	// Update a post for an author
 	api.HandleFunc("/posts/{id}", s.UpdatePostsHandler()).Methods("PUT")
+	// Delete a post for an author
 	api.HandleFunc("/posts/{id}", s.DeletePostsHandler()).Methods("DELETE")
 
 }
