@@ -22,7 +22,7 @@ var (
 	ErrUniqueTitle         = fmt.Errorf("title must be unique")
 	ErrTitleEmpty          = fmt.Errorf("title must not be empty")
 	ErrTitleInvalid        = fmt.Errorf("title must not be longer than 60 characters or shorter than 5 characters")
-	ErrTitleInvalidChars   = fmt.Errorf("title must not contain special characters")
+	ErrTitleInvalidChars   = fmt.Errorf("title must not contain too many special characters")
 	ErrAuthorEmpty         = fmt.Errorf("author must not be empty")
 	ErrTitleFormat         = fmt.Errorf("title must not have excessive whitespace or multiple consecutive spaces")
 	ErrTitleSpammy         = fmt.Errorf("title must not contain spammy patterns or phrases")
@@ -70,7 +70,10 @@ func (p *Persistence) Seed() {
 	for _, author := range authors {
 		// Add the posts from the json file in the resources folder to the posts slice
 		posts, err := getPostsFromFile()
-
+		if len(posts[author.Author]) == 0 {
+			p.logger.Fatal().Err(err).Msg("error getting posts from file")
+			return
+		}
 		if err != nil {
 			p.logger.Fatal().Err(err).Msg("error getting posts from file")
 			return
@@ -124,6 +127,10 @@ func getPostsFromFile() (map[string][]Post, error) {
 func isCapitalizedProperly(title string) bool {
 	words := strings.Fields(title)
 	for _, word := range words {
+		// Discard check if its a number
+		if _, err := fmt.Sscanf(word, "%f", new(float64)); err == nil {
+			continue
+		}
 		if len(word) > 1 && !unicode.IsUpper(rune(word[0])) {
 			return false
 		}
@@ -144,17 +151,18 @@ func validateTitle(title string) error {
 	}
 
 	// Check for unwanted special characters
-	// This regular expression allows letters, numbers, spaces, hyphens, and underscores
-	matched, err := regexp.MatchString("^[a-zA-Z0-9\\-\\_\\s]+$", title)
-	if err != nil {
-		return err
-	}
-	if !matched {
+	// Disallow strings with excessive special characters
+	specialCharPattern := regexp.MustCompile(`[!@#$%^&*()_+{}\[\]:;"'<,>.?/\\|~` + "`" + `]`)
+	// Find all instances of the pattern in the content
+	specialChars := specialCharPattern.FindAllString(title, -1)
+	// Calculate the percentage of the title that is composed of special characters.
+	specialCharPercentage := float64(len(specialChars)) / float64(len(title))
+	if specialCharPercentage > 0.1 { // If more than 10% of the title is special characters.
 		return ErrTitleInvalidChars
 	}
 
 	// Check for excessive whitespace or multiple consecutive spaces
-	matched, err = regexp.MatchString("\\s{2,}", title)
+	matched, err := regexp.MatchString("\\s{2,}", title)
 	if err != nil {
 		return err
 	}

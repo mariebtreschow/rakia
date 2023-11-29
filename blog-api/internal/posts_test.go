@@ -12,7 +12,7 @@ func TestValidateTitle(t *testing.T) {
 		want  error
 		test  string
 	}{
-		{"Valid Title", nil, "valid title"},
+		{"Title 2", nil, "valid title"},
 		{"", ErrTitleEmpty, "empty title"},
 		{"Too long title exceeding the maximum character limit is too long", ErrTitleInvalid, "too long title"},
 		{"!!&&&&& Title", ErrTitleInvalidChars, "title with invalid characters"},
