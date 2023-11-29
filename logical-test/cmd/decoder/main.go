@@ -27,7 +27,7 @@ func (D *Decoder) stringNumbersToLetter(s string) (string, error) {
 		return "", fmt.Errorf("number out of range")
 	}
 	// 'A' is 65 in ASCII, so we add n-1 to it to get the correct letter
-	return string('A' + num - 1), nil
+	return string(rune('A' + num - 1)), nil
 }
 
 func (D *Decoder) decode(digits string, index int, currentLetter string, result *[]string) error {
