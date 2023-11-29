@@ -18,7 +18,6 @@ type PostCreate struct {
 }
 
 type PostUpdate struct {
-	ID      int    `json:"id"`
 	Title   string `json:"title"`
 	Content string `json:"content"`
 	Author  string `json:"author"`
@@ -223,12 +222,6 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 			return
 		}
 
-		// Check if the post ID in the request matches the post ID in the URL
-		if postID != postRequest.ID {
-			s.Logger.Error().Msg("mismatching ids in request and url")
-			writeJSONError(w, "mismatching ids in request and url", http.StatusBadRequest)
-			return
-		}
 		// Check if the author is empty
 		if postRequest.Author == "" {
 			s.Logger.Error().Msg("author must not be empty")
@@ -244,13 +237,13 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		var post internal.Post
 
 		// Update the post
-		post.ID = postRequest.ID // Not being update buy used to find the post
+		post.ID = postID
 		post.Title = postRequest.Title
 		post.Content = postRequest.Content
 		post.Author = postRequest.Author
 
 		// Save the updated post
-		err = s.PostsService.UpdatePosts(post)
+		err = s.PostsService.UpdatePosts(post, author)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error updating post")
 			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {

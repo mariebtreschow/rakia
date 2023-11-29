@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,7 +29,7 @@ func (m *MockPostsService) GetAllPosts(author string) ([]*internal.Post, error) 
 	return args.Get(0).([]*internal.Post), args.Error(1)
 }
 
-func (m *MockPostsService) UpdatePosts(post internal.Post) error {
+func (m *MockPostsService) UpdatePosts(post internal.Post, author string) error {
 	args := m.Called(post)
 	return args.Error(0)
 }
@@ -180,7 +179,7 @@ func TestUpdatePostsHandler(t *testing.T) {
 
 	// Create a mock instance of the PostsService
 	mockPostsService := new(MockPostsService)
-	mockPostsService.On("UpdatePosts", testPostUpdate).Return(nil)
+	mockPostsService.On("UpdatePosts", testPostUpdate, "Author 1").Return(nil)
 
 	// Create an instance of the Server with the mock service
 	server := &Server{PostsService: mockPostsService}
@@ -207,8 +206,6 @@ func TestUpdatePostsHandler(t *testing.T) {
 
 	// Call the handler
 	handler.ServeHTTP(rr, req)
-
-	fmt.Println(rr.Body.String())
 
 	// Check the status code
 	assert.Equal(t, http.StatusAccepted, rr.Code)

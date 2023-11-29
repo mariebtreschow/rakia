@@ -19,7 +19,7 @@ func writeJSONError(w http.ResponseWriter, message string, statusCode int) {
 type PostsService interface {
 	CreatePosts(post internal.Post) error
 	GetAllPosts(author string) ([]*internal.Post, error)
-	UpdatePosts(post internal.Post) error
+	UpdatePosts(post internal.Post, author string) error
 	GetPosts(id int, author string) (*internal.Post, error)
 	DeletePosts(id int, author string) error
 }

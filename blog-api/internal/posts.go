@@ -250,27 +250,22 @@ func (p *Persistence) CreatePosts(post Post) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// Check if the title is unique
+	// Check if the title is unique for the author
 	for _, existingPost := range p.Posts[post.Author] {
 		if existingPost.Title == post.Title {
 			return ErrUniqueTitle
 		}
 	}
 
-	// Validate the title
-	errTitle := validateTitle(post.Title)
-	if errTitle != nil {
-		return errTitle
+	// Validation
+	if err := validateTitle(post.Title); err != nil {
+		return err
 	}
-	// Validate the content
-	errContent := validateContent(post.Content)
-	if errContent != nil {
-		return errContent
+	if err := validateContent(post.Content); err != nil {
+		return err
 	}
-	// Validate the author
-	errAuthor := validateAuthor(post.Author)
-	if errAuthor != nil {
-		return errAuthor
+	if err := validateAuthor(post.Author); err != nil {
+		return err
 	}
 	// Add ID, must be unique
 	post.ID = p.LastID + 1
@@ -336,57 +331,44 @@ func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
 }
 
 // UpdatePosts updates a blogpost
-func (p *Persistence) UpdatePosts(post Post) error {
+func (p *Persistence) UpdatePosts(post Post, author string) error {
 	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// Validate the title
-	errTitle := validateTitle(post.Title)
-	if errTitle != nil {
-		return errTitle
+	// Validation
+	if err := validateTitle(post.Title); err != nil {
+		return err
 	}
-	// Validate the content
-	errContent := validateContent(post.Content)
-	if errContent != nil {
-		return errContent
+	if err := validateContent(post.Content); err != nil {
+		return err
 	}
-	// Validate the author
-	errAuthor := validateAuthor(post.Author)
-	if errAuthor != nil {
-		return errAuthor
+	if err := validateAuthor(post.Author); err != nil {
+		return err
 	}
+
 	// If admin is the author, update any posts
-	if post.Author == "admin" {
-		for _, posts := range p.Posts {
-			for i := range posts {
-				// Make sure the post belongs to the author
-				if posts[i].ID == post.ID {
+	if author == "admin" {
+		for authorKey, posts := range p.Posts {
+			for i, existingPost := range posts {
+				if existingPost.ID == post.ID {
 					posts[i] = post
+					p.Posts[authorKey] = posts
 					return nil
 				}
 			}
 		}
-	}
-	// If the author is not admin, update only the posts for that author
-	posts := p.Posts[post.Author]
-	for i := range posts {
-		// Make sure the post belongs to the author
-		if posts[i].ID == post.ID && posts[i].Author == post.Author {
-			posts[i] = post
-			return nil
+	} else {
+		// If the author is not admin, update only the posts for that author
+		posts := p.Posts[post.Author]
+		for i, existingPost := range posts {
+			if existingPost.ID == post.ID && existingPost.Author == post.Author {
+				posts[i] = post
+				p.Posts[post.Author] = posts
+				return nil
+			}
 		}
-	}
-	return ErrPostNotFound
-}
 
-// removePost removes a blogpost from the posts slice
-func (p *Persistence) removePost(id int, posts []Post) error {
-	for i := range posts {
-		if posts[i].ID == id {
-			posts = append(posts[:i], posts[i+1:]...)
-			return nil
-		}
 	}
 	return ErrPostNotFound
 }
@@ -396,19 +378,25 @@ func (p *Persistence) DeletePosts(id int, author string) error {
 	// Delete the post from the posts slice
 	// If admin is the author, delete any posts
 	if author == "admin" {
-		for _, posts := range p.Posts {
-			err := p.removePost(id, posts)
-			if err != nil {
-				return err
+		for authorKey, posts := range p.Posts {
+			for i, post := range posts {
+				if post.ID == id {
+					// Delete the post from the posts slice when the ID matches
+					p.Posts[authorKey] = append(posts[:i], posts[i+1:]...)
+					return nil
+				}
 			}
-			return nil
+		}
+	} else {
+		// If the author is not admin, delete only the posts for that author
+		posts := p.Posts[author]
+		for i, post := range posts {
+			if post.ID == id && post.Author == author {
+				// Delete the post from the posts slice
+				p.Posts[author] = append(posts[:i], posts[i+1:]...)
+				return nil
+			}
 		}
 	}
-	// If the author is not admin, delete only the posts for that author
-	posts := p.Posts[author]
-	err := p.removePost(id, posts)
-	if err != nil {
-		return err
-	}
-	return nil
+	return ErrPostNotFound
 }
