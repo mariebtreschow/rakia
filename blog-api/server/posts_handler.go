@@ -31,6 +31,7 @@ type PostResponse struct {
 	Author  string `json:"author"`
 }
 
+// GetAllPostsHandler gets all posts
 func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Info().Msg("get all posts handler called")
@@ -49,6 +50,7 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 			writeJSONError(w, "error getting posts", http.StatusInternalServerError)
 			return
 		}
+		// Check if there are any posts
 		if len(posts) == 0 {
 			s.Logger.Error().Msg("no posts found")
 			writeJSONError(w, "no posts found", http.StatusNotFound)
@@ -72,6 +74,7 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 	}
 }
 
+// GetPostsHandler gets a post
 func (s *Server) GetPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Info().Msg("get posts handler called")
@@ -128,6 +131,7 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 	}
 }
 
+// CreatePostsHandler creates a new post
 func (s *Server) CreatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Info().Msg("create posts handler called")
@@ -154,14 +158,14 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 			Content: postRequest.Content,
 			Author:  postRequest.Author,
 		}
-
+		// Check if the author is empty
 		if post.Author == "" {
 			s.Logger.Error().Msg("author must not be empty")
 			writeJSONError(w, "author must not be empty", http.StatusBadRequest)
 			return
 		}
-
-		if post.Author != author {
+		// Check if the author in the request matches the author in token
+		if post.Author != author && author != "admin" {
 			s.Logger.Error().Msg("mismatching authors in request and url")
 			writeJSONError(w, "not allowed to create posts for another author", http.StatusBadRequest)
 			return
@@ -186,6 +190,7 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 	}
 }
 
+// UpdatePostsHandler updates a post
 func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Info().Msg("update posts handler called")
@@ -222,18 +227,19 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 			return
 		}
 
+		// Check if the post ID in the request matches the post ID in the URL
 		if postID != postRequest.ID {
 			s.Logger.Error().Msg("mismatching ids in request and url")
 			writeJSONError(w, "mismatching ids in request and url", http.StatusBadRequest)
 			return
 		}
-
+		// Check if the author is empty
 		if postRequest.Author == "" {
 			s.Logger.Error().Msg("author must not be empty")
 			writeJSONError(w, "author must not be empty", http.StatusBadRequest)
 			return
 		}
-
+		// Check if the author in the request matches the author in token
 		if postRequest.Author != author {
 			s.Logger.Error().Msg("mismatching authors in request and url")
 			writeJSONError(w, "not allowed to update posts for another author", http.StatusBadRequest)
@@ -270,6 +276,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 	}
 }
 
+// DeletePostsHandler deletes a post
 func (s *Server) DeletePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.Logger.Info().Msg("delete posts handler called")

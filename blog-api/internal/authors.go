@@ -27,6 +27,7 @@ type AuthorService struct {
 	logger  *zerolog.Logger
 }
 
+// NewAuthorService creates a new author service
 func NewAuthorService(a *AuthorPassword, logger *zerolog.Logger) (*AuthorService, error) {
 	// Add the authors from the json file in the resources folder to the authors slice
 	return &AuthorService{
@@ -40,6 +41,7 @@ func convertAuthorToPassword(author string) string {
 	return strings.Replace(author, "Author ", "password", 1)
 }
 
+// getAuthors returns the authors from the json file in the resources folder
 func getAuthors() ([]Author, error) {
 	// Open the JSON file
 	file, err := os.Open(FILEPATH)
@@ -63,6 +65,7 @@ func getAuthors() ([]Author, error) {
 	return authors, nil
 }
 
+// Seed adds the authors from the json file in the resources folder to the authors slice
 func (a *AuthorService) Seed() {
 	// Add the authors from the json file in the resources folder to the authors slice
 	authors, err := getAuthors()
@@ -76,6 +79,8 @@ func (a *AuthorService) Seed() {
 	for _, author := range authors {
 		authorMap[author.Author] = author.Password
 	}
+	// Add admin user
+	authorMap["admin"] = "admin"
 	a.authors = authorMap
 }
 

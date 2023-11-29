@@ -53,6 +53,7 @@ type Persistence struct {
 	logger *zerolog.Logger
 }
 
+// NewPersistance creates a new blogposts service
 func NewPersistance(ap *AuthorPostsMap, al *AuthorLastIDMap, logger *zerolog.Logger) (*Persistence, error) {
 	return &Persistence{
 		Posts:  *ap,
@@ -61,6 +62,7 @@ func NewPersistance(ap *AuthorPostsMap, al *AuthorLastIDMap, logger *zerolog.Log
 	}, nil
 }
 
+// Seed the blogposts
 func (p *Persistence) Seed() {
 	// Add the authors from the json file in the resources folder to the authors slice
 	authors, err := getAuthors()
@@ -79,7 +81,9 @@ func (p *Persistence) Seed() {
 			p.logger.Fatal().Err(err).Msg("error getting posts from file")
 			return
 		}
+		// Add the posts to the posts slice
 		p.Posts[author.Author] = posts[author.Author]
+		// Add the lastID to the lastID slice to keep track of the last ID
 		p.LastID[author.Author] = posts[author.Author][len(posts[author.Author])-1].ID
 	}
 }
@@ -132,9 +136,11 @@ func isCapitalizedProperly(title string) bool {
 		if _, err := fmt.Sscanf(word, "%f", new(float64)); err == nil {
 			continue
 		}
+		// Check if the first letter is uppercase
 		if len(word) > 1 && !unicode.IsUpper(rune(word[0])) {
 			return false
 		}
+		// Check if the rest of the letters are lowercase
 		if len(word) > 1 && unicode.IsUpper(rune(word[0])) && strings.ToLower(word[1:]) != word[1:] {
 			return false
 		}
@@ -142,11 +148,14 @@ func isCapitalizedProperly(title string) bool {
 	return true
 }
 
+// validateTitle checks if the title is empty, too long, has too many special characters, has excessive whitespace or multiple consecutive spaces, or contains spammy patterns or phrases.
 func validateTitle(title string) error {
+	// Check for empty title
 	if title == "" {
 		return ErrTitleEmpty
 	}
 
+	// Check for title length
 	if len(title) > 60 || len(title) < 5 {
 		return ErrTitleInvalid
 	}
@@ -186,6 +195,7 @@ func validateTitle(title string) error {
 	return nil
 }
 
+// validateContent checks if the content is empty or too long, and if it has too many special characters
 func validateContent(content string) error {
 	if content == "" {
 		return ErrContentEmpty
@@ -212,7 +222,9 @@ func validateContent(content string) error {
 	for _, r := range content {
 		if unicode.IsLetter(r) || unicode.IsNumber(r) {
 			escapedR := regexp.QuoteMeta(string(r))
-			pattern := regexp.MustCompile(escapedR + `{4,}`) // Match 4 or more consecutive identical characters
+
+			// Match 4 or more consecutive identical characters
+			pattern := regexp.MustCompile(escapedR + `{4,}`)
 			if pattern.FindString(content) != "" {
 				return ErrContentConsecutiveChar
 			}
@@ -222,7 +234,9 @@ func validateContent(content string) error {
 	return nil
 }
 
+// validateAuthor checks if the author is empty
 func validateAuthor(author string) error {
+	// Check for empty author
 	if author == "" {
 		return ErrAuthorEmpty
 	}
