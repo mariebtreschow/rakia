@@ -28,17 +28,16 @@ func main() {
 	// Logger for the server
 	logger := server.NewLogger()
 
-	// Create new blog posts service
-	logger.Info().Msg("seeding blog posts")
-
 	p := make(internal.AuthorPostsMap)
 	l := make(internal.AuthorLastIDMap)
 
+	// Create new blog posts service
 	posts, err := internal.NewPersistance(&p, &l, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("error creating blog posts service")
 	}
 
+	logger.Info().Msg("seeding blog posts")
 	// Seed the blog posts
 	posts.Seed()
 

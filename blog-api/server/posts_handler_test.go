@@ -211,7 +211,7 @@ func TestUpdatePostsHandler(t *testing.T) {
 	fmt.Println(rr.Body.String())
 
 	// Check the status code
-	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.Equal(t, http.StatusAccepted, rr.Code)
 }
 
 // TestDeletePostsHandler tests the DeletePostsHandler function

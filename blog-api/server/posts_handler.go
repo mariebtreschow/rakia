@@ -34,7 +34,6 @@ type PostResponse struct {
 // GetAllPostsHandler gets all posts
 func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.Logger.Info().Msg("get all posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
@@ -77,7 +76,6 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 // GetPostsHandler gets a post
 func (s *Server) GetPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.Logger.Info().Msg("get posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
@@ -134,7 +132,6 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 // CreatePostsHandler creates a new post
 func (s *Server) CreatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.Logger.Info().Msg("create posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
@@ -193,7 +190,6 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 // UpdatePostsHandler updates a post
 func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.Logger.Info().Msg("update posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
@@ -240,7 +236,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 			return
 		}
 		// Check if the author in the request matches the author in token
-		if postRequest.Author != author {
+		if postRequest.Author != author && author != "admin" {
 			s.Logger.Error().Msg("mismatching authors in request and url")
 			writeJSONError(w, "not allowed to update posts for another author", http.StatusBadRequest)
 			return
@@ -279,7 +275,6 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 // DeletePostsHandler deletes a post
 func (s *Server) DeletePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.Logger.Info().Msg("delete posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
