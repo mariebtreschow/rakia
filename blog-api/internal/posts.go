@@ -47,10 +47,10 @@ type Persistence struct {
 	logger *zerolog.Logger
 }
 
-func NewPersistance(logger *zerolog.Logger) (*Persistence, error) {
+func NewPersistance(ap *AuthorPostsMap, al *AuthorLastIDMap, logger *zerolog.Logger) (*Persistence, error) {
 	return &Persistence{
-		Posts:  make(AuthorPostsMap),
-		LastID: make(AuthorLastIDMap),
+		Posts:  *ap,
+		LastID: *al,
 		logger: logger,
 	}, nil
 }

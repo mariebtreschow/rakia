@@ -30,7 +30,11 @@ func main() {
 
 	// Create new blog posts service
 	logger.Info().Msg("seeding blog posts")
-	posts, err := internal.NewPersistance(logger)
+
+	p := make(internal.AuthorPostsMap)
+	l := make(internal.AuthorLastIDMap)
+
+	posts, err := internal.NewPersistance(&p, &l, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("error creating blog posts service")
 	}
@@ -38,14 +42,18 @@ func main() {
 	// Seed the blog posts
 	posts.Seed()
 
+	a := make(internal.AuthorPassword)
 	// Create a new author service
 	logger.Info().Msg("creating author service")
-	authors, err := internal.NewAuthorService(logger)
+	authors, err := internal.NewAuthorService(&a, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("error creating author service")
 	}
 
-	// Create a new mux router TODO: add why we use mux
+	// Seed the authors
+	authors.Seed()
+
+	// Create a new mux router
 	router := mux.NewRouter()
 
 	// Create a new server

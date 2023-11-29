@@ -20,9 +20,19 @@ type AuthorData struct {
 	Authors []Author `json:"posts"` // from json file
 }
 
+type AuthorPassword map[string]string
+
 type AuthorService struct {
-	authors []Author
+	authors AuthorPassword
 	logger  *zerolog.Logger
+}
+
+func NewAuthorService(a *AuthorPassword, logger *zerolog.Logger) (*AuthorService, error) {
+	// Add the authors from the json file in the resources folder to the authors slice
+	return &AuthorService{
+		authors: *a,
+		logger:  logger,
+	}, nil
 }
 
 // convertAuthorToPassword replaces "Author" with "password" in the given string.
@@ -53,26 +63,29 @@ func getAuthors() ([]Author, error) {
 	return authors, nil
 }
 
-func NewAuthorService(logger *zerolog.Logger) (*AuthorService, error) {
+func (a *AuthorService) Seed() {
 	// Add the authors from the json file in the resources folder to the authors slice
 	authors, err := getAuthors()
 	if err != nil {
-		return nil, fmt.Errorf("error getting authors: %w", err)
+		a.logger.Fatal().Err(err).Msg("error getting authors from file")
+		return
 	}
-	return &AuthorService{
-		authors: authors,
-		logger:  logger,
-	}, nil
+
+	// Convert the authors to a map
+	authorMap := make(map[string]string)
+	for _, author := range authors {
+		authorMap[author.Author] = author.Password
+	}
+	a.authors = authorMap
 }
 
 // ValidAuthor returns the author id if the username and password are valid
 func (a *AuthorService) ValidAuthor(username string, password string) (bool, error) {
-	// Since its only 100 authors, we can just loop through them, but if we had a lot of authors
-	// We would want to use a map to store the authors and their passwords
-	for _, author := range a.authors {
-		if author.Author == username && author.Password == password {
+	if val, ok := (a.authors)[username]; ok {
+		if val == password {
 			return true, nil
 		}
+		return false, nil
 	}
 	return false, nil
 }

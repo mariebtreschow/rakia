@@ -33,6 +33,7 @@ type PostResponse struct {
 
 func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		s.Logger.Info().Msg("get all posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
@@ -73,7 +74,7 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 
 func (s *Server) GetPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		s.Logger.Info().Msg("get posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
@@ -129,9 +130,11 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 
 func (s *Server) CreatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		s.Logger.Info().Msg("create posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
+			s.Logger.Error().Msg("error getting author from context")
 			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
@@ -140,6 +143,7 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 		var postRequest PostCreate
 		err := json.NewDecoder(r.Body).Decode(&postRequest)
 		if err != nil {
+			s.Logger.Error().Err(err).Msg("invalid request payload")
 			writeJSONError(w, "invalid request payload", http.StatusBadRequest)
 			return
 		}
@@ -148,14 +152,25 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 		post := internal.Post{
 			Title:   postRequest.Title,
 			Content: postRequest.Content,
+			Author:  postRequest.Author,
 		}
 
-		// Add the author to the post
-		post.Author = author
+		if post.Author == "" {
+			s.Logger.Error().Msg("author must not be empty")
+			writeJSONError(w, "author must not be empty", http.StatusBadRequest)
+			return
+		}
+
+		if post.Author != author {
+			s.Logger.Error().Msg("mismatching authors in request and url")
+			writeJSONError(w, "not allowed to create posts for another author", http.StatusBadRequest)
+			return
+		}
 
 		// Save the post
 		err = s.PostsService.CreatePosts(post)
 		if err != nil {
+			s.Logger.Error().Err(err).Msg("error creating post")
 			// Handle validation errors
 			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {
 				writeJSONError(w, err.Error(), http.StatusBadRequest)
@@ -173,10 +188,11 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 
 func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		s.Logger.Info().Msg("update posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
+			s.Logger.Error().Msg("error getting author from context")
 			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
 			return
 		}
@@ -184,6 +200,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		// Get the post ID from the URL
 		id, ok := mux.Vars(r)["id"]
 		if !ok {
+			s.Logger.Error().Msg("missing post id")
 			writeJSONError(w, "missing post id", http.StatusBadRequest)
 			return
 		}
@@ -211,9 +228,15 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 			return
 		}
 
+		if postRequest.Author == "" {
+			s.Logger.Error().Msg("author must not be empty")
+			writeJSONError(w, "author must not be empty", http.StatusBadRequest)
+			return
+		}
+
 		if postRequest.Author != author {
 			s.Logger.Error().Msg("mismatching authors in request and url")
-			writeJSONError(w, "not allowed to update posts for unautheticated author", http.StatusBadRequest)
+			writeJSONError(w, "not allowed to update posts for another author", http.StatusBadRequest)
 			return
 		}
 		var post internal.Post
@@ -227,8 +250,8 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		// Save the updated post
 		err = s.PostsService.UpdatePosts(post)
 		if err != nil {
+			s.Logger.Error().Err(err).Msg("error updating post")
 			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {
-				s.Logger.Error().Err(err).Msg("error updating post")
 				writeJSONError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
@@ -237,7 +260,6 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 				writeJSONError(w, "post not found", http.StatusNotFound)
 				return
 			}
-			s.Logger.Error().Err(err).Msg("error updating post")
 			writeJSONError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -250,7 +272,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 
 func (s *Server) DeletePostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		s.Logger.Info().Msg("delete posts handler called")
 		// Get the context from the request
 		author, ok := r.Context().Value(ContextAuthor).(string)
 		if !ok {
