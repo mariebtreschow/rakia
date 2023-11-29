@@ -6,22 +6,27 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/rs/zerolog"
 )
 
 var (
-	ErrPostNotFound      = fmt.Errorf("post not found")
-	ErrContentEmpty      = fmt.Errorf("content must not be empty")
-	ErrContentInvalid    = fmt.Errorf("content must not be longer than 1600 characters or shorter than 100")
-	ErrContentEncoding   = fmt.Errorf("content must be valid UTF-8")
-	ErrUniqueTitle       = fmt.Errorf("title must be unique")
-	ErrTitleEmpty        = fmt.Errorf("title must not be empty")
-	ErrTitleInvalid      = fmt.Errorf("title must not be longer than 50 characters or shorter than 5 characters")
-	ErrTitleInvalidChars = fmt.Errorf("title must not contain special characters")
-	ErrAuthorEmpty       = fmt.Errorf("author must not be empty")
+	ErrPostNotFound        = fmt.Errorf("post not found")
+	ErrContentEmpty        = fmt.Errorf("content must not be empty")
+	ErrContentInvalid      = fmt.Errorf("content must not be longer than 1600 characters or shorter than 100 and cannot have too many special characters")
+	ErrContentEncoding     = fmt.Errorf("content must be valid UTF-8")
+	ErrUniqueTitle         = fmt.Errorf("title must be unique")
+	ErrTitleEmpty          = fmt.Errorf("title must not be empty")
+	ErrTitleInvalid        = fmt.Errorf("title must not be longer than 60 characters or shorter than 5 characters")
+	ErrTitleInvalidChars   = fmt.Errorf("title must not contain special characters")
+	ErrAuthorEmpty         = fmt.Errorf("author must not be empty")
+	ErrTitleFormat         = fmt.Errorf("title must not have excessive whitespace or multiple consecutive spaces")
+	ErrTitleSpammy         = fmt.Errorf("title must not contain spammy patterns or phrases")
+	ErrTitleCapitalization = fmt.Errorf("title must follow capitalization rules")
 )
 
 type Post struct {
@@ -115,6 +120,20 @@ func getPostsFromFile() (map[string][]Post, error) {
 	return authorPosts, nil
 }
 
+// isCapitalizedProperly checks if the title follows the capitalization rules.
+func isCapitalizedProperly(title string) bool {
+	words := strings.Fields(title)
+	for _, word := range words {
+		if len(word) > 1 && !unicode.IsUpper(rune(word[0])) {
+			return false
+		}
+		if len(word) > 1 && unicode.IsUpper(rune(word[0])) && strings.ToLower(word[1:]) != word[1:] {
+			return false
+		}
+	}
+	return true
+}
+
 func validateTitle(title string) error {
 	if title == "" {
 		return ErrTitleEmpty
@@ -133,6 +152,28 @@ func validateTitle(title string) error {
 	if !matched {
 		return ErrTitleInvalidChars
 	}
+
+	// Check for excessive whitespace or multiple consecutive spaces
+	matched, err = regexp.MatchString("\\s{2,}", title)
+	if err != nil {
+		return err
+	}
+	if matched {
+		return ErrTitleFormat
+	}
+
+	// Validate against common spammy patterns or phrases.
+	spammyPatterns := []string{"buy now", "discount"} // Example patterns, extend as needed
+	for _, pattern := range spammyPatterns {
+		if strings.Contains(strings.ToLower(title), pattern) {
+			return ErrTitleSpammy
+		}
+	}
+
+	// Implement a check for word capitalization rules.
+	if !isCapitalizedProperly(title) {
+		return ErrTitleCapitalization
+	}
 	return nil
 }
 
@@ -149,7 +190,12 @@ func validateContent(content string) error {
 	}
 	// Disallow strings with excessive special characters
 	specialCharPattern := regexp.MustCompile(`[!@#$%^&*()_+{}\[\]:;"'<,>.?/\\|~` + "`" + `]`)
-	if len(specialCharPattern.FindAllString(content, -1)) > len(content)/2 { // Example condition
+	// Find all instances of the pattern in the content
+	specialChars := specialCharPattern.FindAllString(content, -1)
+
+	// Check if the number of special characters exceeds a tenth of the length of the content
+	if len(specialChars) > len(content)/10 {
+		// If condition is true, return the ErrContentInvalid
 		return ErrContentInvalid
 	}
 
