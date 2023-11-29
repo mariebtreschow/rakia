@@ -20,7 +20,7 @@ func main() {
 
 	var (
 		listenPort = fs.String("port", "8080", "port to listen on")
-		wait       = fs.Duration("graceful-timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
+		wait       = fs.Duration("graceful_timeout", time.Second*15, "the duration for which the server gracefully wait for existing connections to finish - e.g. 15s or 1m")
 	)
 
 	fs.Parse(os.Args[1:])

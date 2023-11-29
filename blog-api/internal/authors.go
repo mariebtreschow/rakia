@@ -1,6 +1,3 @@
-//go:build go1.20
-// +build go1.20
-
 package internal
 
 import (
@@ -71,7 +68,7 @@ func NewAuthorService(logger *zerolog.Logger) (*AuthorService, error) {
 // ValidAuthor returns the author id if the username and password are valid
 func (a *AuthorService) ValidAuthor(username string, password string) (bool, error) {
 	// Since its only 100 authors, we can just loop through them, but if we had a lot of authors
-	// we would want to use a map to store the authors and their passwords
+	// We would want to use a map to store the authors and their passwords
 	for _, author := range a.authors {
 		if author.Author == username && author.Password == password {
 			return true, nil

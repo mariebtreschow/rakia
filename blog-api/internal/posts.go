@@ -143,10 +143,16 @@ func validateContent(content string) error {
 	if len(content) > 1600 || len(content) < 100 {
 		return ErrContentInvalid
 	}
-	// Check for proper UTF-8 encoding
+	// Check for proper UTF-8 encoding and make sure its letters not just symbols
 	if !utf8.ValidString(content) {
 		return ErrContentEncoding
 	}
+	// Disallow strings with excessive special characters
+	specialCharPattern := regexp.MustCompile(`[!@#$%^&*()_+{}\[\]:;"'<,>.?/\\|~` + "`" + `]`)
+	if len(specialCharPattern.FindAllString(content, -1)) > len(content)/2 { // Example condition
+		return ErrContentInvalid
+	}
+
 	return nil
 }
 
