@@ -15,18 +15,19 @@ import (
 )
 
 var (
-	ErrPostNotFound        = fmt.Errorf("post not found")
-	ErrContentEmpty        = fmt.Errorf("content must not be empty")
-	ErrContentInvalid      = fmt.Errorf("content must not be longer than 1600 characters or shorter than 100 and cannot have too many special characters")
-	ErrContentEncoding     = fmt.Errorf("content must be valid UTF-8")
-	ErrUniqueTitle         = fmt.Errorf("title must be unique")
-	ErrTitleEmpty          = fmt.Errorf("title must not be empty")
-	ErrTitleInvalid        = fmt.Errorf("title must not be longer than 60 characters or shorter than 5 characters")
-	ErrTitleInvalidChars   = fmt.Errorf("title must not contain too many special characters")
-	ErrAuthorEmpty         = fmt.Errorf("author must not be empty")
-	ErrTitleFormat         = fmt.Errorf("title must not have excessive whitespace or multiple consecutive spaces")
-	ErrTitleSpammy         = fmt.Errorf("title must not contain spammy patterns or phrases")
-	ErrTitleCapitalization = fmt.Errorf("title must follow capitalization rules")
+	ErrPostNotFound           = fmt.Errorf("post not found")
+	ErrContentEmpty           = fmt.Errorf("content must not be empty")
+	ErrContentInvalid         = fmt.Errorf("content must not be longer than 1600 characters or shorter than 100 and cannot have too many special characters")
+	ErrContentEncoding        = fmt.Errorf("content must be valid UTF-8")
+	ErrUniqueTitle            = fmt.Errorf("title must be unique")
+	ErrTitleEmpty             = fmt.Errorf("title must not be empty")
+	ErrTitleInvalid           = fmt.Errorf("title must not be longer than 60 characters or shorter than 5 characters")
+	ErrTitleInvalidChars      = fmt.Errorf("title must not contain too many special characters")
+	ErrAuthorEmpty            = fmt.Errorf("author must not be empty")
+	ErrTitleFormat            = fmt.Errorf("title must not have excessive whitespace or multiple consecutive spaces")
+	ErrTitleSpammy            = fmt.Errorf("title must not contain spammy patterns or phrases")
+	ErrTitleCapitalization    = fmt.Errorf("title must follow capitalization rules")
+	ErrContentConsecutiveChar = fmt.Errorf("content must not have excessive consecutive identical characters")
 )
 
 type Post struct {
@@ -202,9 +203,20 @@ func validateContent(content string) error {
 	specialChars := specialCharPattern.FindAllString(content, -1)
 
 	// Check if the number of special characters exceeds a tenth of the length of the content
-	if len(specialChars) > len(content)/10 {
+	if float64(len(specialChars)) > float64(len(content))/10 {
 		// If condition is true, return the ErrContentInvalid
 		return ErrContentInvalid
+	}
+
+	// Check for excessive consecutive identical characters.
+	for _, r := range content {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			escapedR := regexp.QuoteMeta(string(r))
+			pattern := regexp.MustCompile(escapedR + `{4,}`) // Match 4 or more consecutive identical characters
+			if pattern.FindString(content) != "" {
+				return ErrContentConsecutiveChar
+			}
+		}
 	}
 
 	return nil
