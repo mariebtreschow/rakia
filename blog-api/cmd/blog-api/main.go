@@ -28,11 +28,11 @@ func main() {
 	// Logger for the server
 	logger := server.NewLogger()
 
+	// Initialize the author posts map
 	p := make(internal.AuthorPostsMap)
-	l := make(internal.AuthorLastIDMap)
 
 	// Create new blog posts service
-	posts, err := internal.NewPersistance(&p, &l, logger)
+	posts, err := internal.NewPersistance(&p, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("error creating blog posts service")
 	}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"unicode"
@@ -43,21 +44,19 @@ type PostData struct {
 
 type AuthorPostsMap map[string][]Post
 
-type AuthorLastIDMap map[string]int
-
 // Store the blogposts from the json file per author
 type Persistence struct {
 	Posts  AuthorPostsMap
-	LastID AuthorLastIDMap
+	LastID int
 	mutex  sync.Mutex // Protects access to lastID and Posts
 	logger *zerolog.Logger
 }
 
 // NewPersistance creates a new blogposts service
-func NewPersistance(ap *AuthorPostsMap, al *AuthorLastIDMap, logger *zerolog.Logger) (*Persistence, error) {
+func NewPersistance(ap *AuthorPostsMap, logger *zerolog.Logger) (*Persistence, error) {
 	return &Persistence{
 		Posts:  *ap,
-		LastID: *al,
+		LastID: 0,
 		logger: logger,
 	}, nil
 }
@@ -83,8 +82,10 @@ func (p *Persistence) Seed() {
 		}
 		// Add the posts to the posts slice
 		p.Posts[author.Author] = posts[author.Author]
-		// Add the lastID to the lastID slice to keep track of the last ID
-		p.LastID[author.Author] = posts[author.Author][len(posts[author.Author])-1].ID
+		// Add the lastID as a global variable
+		// From the last author get the last ID
+		p.LastID = int(posts[author.Author][len(posts[author.Author])-1].ID)
+
 	}
 }
 
@@ -272,9 +273,9 @@ func (p *Persistence) CreatePosts(post Post) error {
 		return errAuthor
 	}
 	// Add ID, must be unique
-	post.ID = p.LastID[post.Author] + 1
+	post.ID = p.LastID + 1
 	// Increment the lastID
-	p.LastID[post.Author] = post.ID
+	p.LastID = post.ID
 
 	// Add the post to the posts slice
 	p.Posts[post.Author] = append(p.Posts[post.Author], post)
@@ -293,6 +294,10 @@ func (p *Persistence) GetAllPosts(author string) ([]*Post, error) {
 				postPointers = append(postPointers, &posts[i])
 			}
 		}
+		// Order the posts by ID
+		sort.Slice(postPointers, func(i, j int) bool {
+			return postPointers[i].ID < postPointers[j].ID
+		})
 		return postPointers, nil
 	}
 
@@ -305,35 +310,29 @@ func (p *Persistence) GetAllPosts(author string) ([]*Post, error) {
 	return postPointers, nil
 }
 
-// findPost finds a blogpost by id
-func (p *Persistence) findPost(id int, posts []Post) (*Post, error) {
-	for i := range posts {
-		if posts[i].ID == id {
-			return &posts[i], nil
-		}
-	}
-	return nil, ErrPostNotFound
-}
-
 // GetPosts gets a blogpost by id
 func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
 	// If admin is the author, return all posts
 	if author == "admin" {
 		for _, posts := range p.Posts {
-			post, err := p.findPost(id, posts)
-			if err != nil {
-				return nil, err
+			for i := range posts {
+				// Make sure the post belongs to the author
+				if posts[i].ID == id {
+					return &posts[i], nil
+				}
 			}
-			return post, nil
 		}
 	}
 	// If the author is not admin, return only the posts for that author
 	posts := p.Posts[author]
-	post, err := p.findPost(id, posts)
-	if err != nil {
-		return nil, err
+	for i := range posts {
+		// Make sure the post belongs to the author
+		if posts[i].ID == id && posts[i].Author == author {
+			return &posts[i], nil
+		}
 	}
-	return post, nil
+
+	return nil, ErrPostNotFound
 }
 
 // UpdatePosts updates a blogpost
