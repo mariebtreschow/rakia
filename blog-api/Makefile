@@ -18,8 +18,9 @@ DOCKERFILE_PATH=./Dockerfile
 docker-build:
 	@docker build -t $(IMAGE_NAME):$(TAG) -f $(DOCKERFILE_PATH) $(BUILD_CONTEXT)
 
+# Expose port 8080
 docker-run:
-	@docker run -it --rm $(IMAGE_NAME):$(TAG)
+	@docker run -p 8080:8080 -d -it --rm $(IMAGE_NAME):$(TAG) 
 
 api:
 	go run cmd/$(BINARY_NAME)/main.go
