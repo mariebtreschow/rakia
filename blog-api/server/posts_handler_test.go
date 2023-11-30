@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"rakia.ai/blog-api/v2/internal"
@@ -20,7 +22,7 @@ type MockPostsService struct {
 }
 
 func (m *MockPostsService) CreatePosts(post internal.Post, author string) error {
-	args := m.Called(post)
+	args := m.Called(post, author)
 	return args.Error(0)
 }
 
@@ -30,7 +32,7 @@ func (m *MockPostsService) GetAllPosts(author string) ([]*internal.Post, error) 
 }
 
 func (m *MockPostsService) UpdatePosts(post internal.Post, author string) error {
-	args := m.Called(post)
+	args := m.Called(post, author)
 	return args.Error(0)
 }
 
@@ -48,21 +50,23 @@ var testPost = internal.Post{
 	ID:      1,
 	Title:   "Test Post 1",
 	Content: "Content 1",
-	Author:  "Author1",
+	Author:  "Author 1",
 }
 
 var testPostUpdate = internal.Post{
 	ID:      1,
 	Title:   "Test Post 1",
 	Content: "Content 33333",
-	Author:  "Author1",
+	Author:  "Author 1",
 }
 
 var testPostCreate = internal.Post{
 	Title:   "Test Post 2",
 	Content: "Content 2",
-	Author:  "Author1",
+	Author:  "Author 1",
 }
+
+var logger = zerolog.New(os.Stdout)
 
 // TestGetAllPostsHandler tests the GetAllPostsHandler function
 func TestGetAllPostsHandler(t *testing.T) {
@@ -70,11 +74,12 @@ func TestGetAllPostsHandler(t *testing.T) {
 	mockPostsService := new(MockPostsService)
 	mockPosts := []*internal.Post{}
 	mockPosts = append(mockPosts, &testPost)
+	// Create a logger instance or mock
 
-	mockPostsService.On("GetAllPosts", "Author1").Return(mockPosts, nil)
+	mockPostsService.On("GetAllPosts", "Author 1").Return(mockPosts, nil)
 
 	// Create an instance of the Server with the mock service
-	server := &Server{PostsService: mockPostsService}
+	server := &Server{PostsService: mockPostsService, Logger: &logger}
 
 	// Create a request to pass to the handler
 	req, err := http.NewRequest("GET", "/api/posts", nil)
@@ -83,7 +88,7 @@ func TestGetAllPostsHandler(t *testing.T) {
 	}
 
 	// Adding context with author value
-	ctx := context.WithValue(req.Context(), ContextAuthor, "Author1")
+	ctx := context.WithValue(req.Context(), ContextAuthor, "Author 1")
 	req = req.WithContext(ctx)
 
 	// Record the response using httptest
@@ -106,10 +111,10 @@ func TestGetPostsHandler(t *testing.T) {
 	// Create a mock instance of the PostsService
 	mockPostsService := new(MockPostsService)
 	mockPost := &testPost
-	mockPostsService.On("GetPosts", 1, "Author1").Return(mockPost, nil)
+	mockPostsService.On("GetPostByID", 1, "Author 1").Return(mockPost, nil)
 
 	// Create an instance of the Server with the mock service
-	server := &Server{PostsService: mockPostsService}
+	server := &Server{PostsService: mockPostsService, Logger: &logger}
 
 	// Create a request to pass to the handler
 	req, err := http.NewRequest("GET", "/api/posts/1", nil)
@@ -121,7 +126,7 @@ func TestGetPostsHandler(t *testing.T) {
 	}
 
 	// Adding context with author value
-	ctx := context.WithValue(req.Context(), ContextAuthor, "Author1")
+	ctx := context.WithValue(req.Context(), ContextAuthor, "Author 1")
 	req = req.WithContext(ctx)
 
 	// Record the response using httptest
@@ -147,7 +152,7 @@ func TestCreatePostsHandler(t *testing.T) {
 	mockPostsService.On("CreatePosts", testPostCreate, "Author 1").Return(nil)
 
 	// Create an instance of the Server with the mock service
-	server := &Server{PostsService: mockPostsService}
+	server := &Server{PostsService: mockPostsService, Logger: &logger}
 
 	// Create a request to pass to the handler
 	jsonPost, err := json.Marshal(testPostCreate)
@@ -160,7 +165,7 @@ func TestCreatePostsHandler(t *testing.T) {
 	}
 
 	// Adding context with author value
-	ctx := context.WithValue(req.Context(), ContextAuthor, "Author1")
+	ctx := context.WithValue(req.Context(), ContextAuthor, "Author 1")
 	req = req.WithContext(ctx)
 
 	// Record the response using httptest
@@ -182,7 +187,7 @@ func TestUpdatePostsHandler(t *testing.T) {
 	mockPostsService.On("UpdatePosts", testPostUpdate, "Author 1").Return(nil)
 
 	// Create an instance of the Server with the mock service
-	server := &Server{PostsService: mockPostsService}
+	server := &Server{PostsService: mockPostsService, Logger: &logger}
 
 	// Create a request to pass to the handler
 	jsonPost, err := json.Marshal(testPostUpdate)
@@ -197,7 +202,7 @@ func TestUpdatePostsHandler(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "1"})
 
 	// Adding context with author value
-	ctx := context.WithValue(req.Context(), ContextAuthor, "Author1")
+	ctx := context.WithValue(req.Context(), ContextAuthor, "Author 1")
 	req = req.WithContext(ctx)
 
 	// Record the response using httptest
@@ -216,10 +221,10 @@ func TestDeletePostsHandler(t *testing.T) {
 
 	// Create a mock instance of the PostsService
 	mockPostsService := new(MockPostsService)
-	mockPostsService.On("DeletePosts", 1, "Author1").Return(nil)
+	mockPostsService.On("DeletePosts", 1, "Author 1").Return(nil)
 
 	// Create an instance of the Server with the mock service
-	server := &Server{PostsService: mockPostsService}
+	server := &Server{PostsService: mockPostsService, Logger: &logger}
 
 	// Create a request to pass to the handler
 	req, err := http.NewRequest("DELETE", "/api/posts/1", nil)
@@ -230,7 +235,7 @@ func TestDeletePostsHandler(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "1"})
 
 	// Adding context with author value
-	ctx := context.WithValue(req.Context(), ContextAuthor, "Author1")
+	ctx := context.WithValue(req.Context(), ContextAuthor, "Author 1")
 	req = req.WithContext(ctx)
 
 	// Record the response using httptest

@@ -244,6 +244,7 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 			writeJSONError(w, "author must not be empty", http.StatusBadRequest)
 			return
 		}
+
 		// Check if the author in the request matches the author in token
 		if postRequest.Author != author && author != "admin" {
 			s.Logger.Error().Msg("mismatching authors in request and url")
@@ -262,7 +263,6 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		err = s.PostsService.UpdatePosts(post, author)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error updating post")
-			// Handle validation errors
 			// Handle validation errors
 			switch err {
 			case internal.ErrUniqueTitle,
