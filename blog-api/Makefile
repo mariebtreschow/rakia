@@ -15,15 +15,18 @@ BUILD_CONTEXT=.
 # Dockerfile location
 DOCKERFILE_PATH=./Dockerfile
 
+# Build the application
 docker-build:
 	@docker build -t $(IMAGE_NAME):$(TAG) -f $(DOCKERFILE_PATH) $(BUILD_CONTEXT)
 
-# Expose port 8080
+# Run the docker image
 docker-run:
 	@docker run -p 8080:8080 -d -it --rm $(IMAGE_NAME):$(TAG) 
 
+# Run the application locally
 api:
 	go run cmd/$(BINARY_NAME)/main.go
 
+# Run all tests
 tests:
 	go test -v ./...
