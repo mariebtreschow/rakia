@@ -177,7 +177,18 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error creating post")
 			// Handle validation errors
-			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars || err == internal.ErrTitleSpammy || err == internal.ErrTitleCapitalization || err == internal.ErrAuthorNameInvalid {
+			switch err {
+			case internal.ErrUniqueTitle,
+				internal.ErrTitleEmpty,
+				internal.ErrTitleInvalid,
+				internal.ErrContentEmpty,
+				internal.ErrContentInvalid,
+				internal.ErrAuthorEmpty,
+				internal.ErrContentEncoding,
+				internal.ErrTitleInvalidChars,
+				internal.ErrTitleSpammy,
+				internal.ErrTitleCapitalization,
+				internal.ErrAuthorNameInvalid:
 				writeJSONError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
@@ -251,7 +262,20 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 		err = s.PostsService.UpdatePosts(post, author)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error updating post")
-			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {
+			// Handle validation errors
+			// Handle validation errors
+			switch err {
+			case internal.ErrUniqueTitle,
+				internal.ErrTitleEmpty,
+				internal.ErrTitleInvalid,
+				internal.ErrContentEmpty,
+				internal.ErrContentInvalid,
+				internal.ErrAuthorEmpty,
+				internal.ErrContentEncoding,
+				internal.ErrTitleInvalidChars,
+				internal.ErrTitleSpammy,
+				internal.ErrTitleCapitalization,
+				internal.ErrAuthorNameInvalid:
 				writeJSONError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
