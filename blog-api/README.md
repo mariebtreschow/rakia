@@ -1,11 +1,14 @@
 RESTful API for a blog platform.
 
+## Notes from Author
+
+I took some liberties when writing this API, in the assignment it didn't say anything about authentication, but I decided to add some simple authentication for demonstration purposes. I added all the authors and with a generated password, also an admin user that has the power to edit and access all content -- otherwise only authors can edit their own posts. 
+
 ## Installation
 
 `go get -u github.com/gorilla/mux`
 
 `go get -u github.com/rs/zerolog`
-
 
 Using gorilla/mux as a router in the API has several advantages:
 - Middleware Support 

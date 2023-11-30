@@ -382,7 +382,7 @@ func (p *PostService) UpdatePosts(post Post, author string) error {
 		}
 
 	}
-	return ErrPostNotFound
+	return nil
 }
 
 // DeletePosts deletes a blogpost
