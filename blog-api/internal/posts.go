@@ -387,7 +387,10 @@ func (p *PostService) UpdatePosts(post Post, author string) error {
 
 // DeletePosts deletes a blogpost
 func (p *PostService) DeletePosts(id int, author string) error {
-	// Delete the post from the posts slice
+	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	// If admin is the author, delete any posts
 	if author == "admin" {
 		for _, posts := range p.Posts {
