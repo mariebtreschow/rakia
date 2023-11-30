@@ -42,91 +42,66 @@ type PostData struct {
 	Posts []Post `json:"posts"` // from json file
 }
 
-type AuthorPostsMap map[string][]Post
+type AuthorPostsMap map[string]map[int]Post
 
 // Store the blogposts from the json file per author
-type Persistence struct {
-	Posts  AuthorPostsMap
+type PostService struct {
+	Posts  map[string]map[int]Post
 	LastID int
 	mutex  sync.Mutex // Protects access to lastID and Posts
 	logger *zerolog.Logger
 }
 
-// NewPersistance creates a new blogposts service
-func NewPersistance(ap *AuthorPostsMap, logger *zerolog.Logger) (*Persistence, error) {
-	return &Persistence{
+// NewPostsService creates a new blogposts service
+func NewPostsService(ap *map[string]map[int]Post, logger *zerolog.Logger) (*PostService, error) {
+	return &PostService{
 		Posts:  *ap,
 		LastID: 0,
 		logger: logger,
 	}, nil
 }
 
-// Seed the blogposts
-func (p *Persistence) Seed() {
-	// Add the authors from the json file in the resources folder to the authors slice
-	authors, err := getAuthors()
-	if err != nil {
-		p.logger.Fatal().Err(err).Msg("error getting authors from file")
-		return
-	}
-	for _, author := range authors {
-		// Add the posts from the json file in the resources folder to the posts slice
-		posts, err := getPostsFromFile()
-		if len(posts[author.Author]) == 0 {
-			p.logger.Fatal().Err(err).Msg("error getting posts from file")
-			return
-		}
-		if err != nil {
-			p.logger.Fatal().Err(err).Msg("error getting posts from file")
-			return
-		}
-		// Add the posts to the posts slice
-		p.Posts[author.Author] = posts[author.Author]
-		// Add the lastID as a global variable
-		// From the last author get the last ID
-		p.LastID = int(posts[author.Author][len(posts[author.Author])-1].ID)
-
-	}
-}
-
 // Add the blogposts from the json file in the resources folder to the posts slice
-func getPostsFromFile() (map[string][]Post, error) {
+func (p *PostService) Seed() error {
 	// Open the JSON file
 	jsonFile, err := os.Open(FILEPATH)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer jsonFile.Close()
 
 	// Read the file content
 	byteValue, err := io.ReadAll(jsonFile)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
+	// Define a variable to hold the data from the JSON file
 	var data PostData
+
 	// Unmarshal the JSON data into the posts slice
 	if err := json.Unmarshal(byteValue, &data); err != nil {
-		return nil, err
+		return err
 	}
-
-	// Define a variable to hold the data from the JSON file
-	authorPosts := make(AuthorPostsMap)
 
 	// Add the posts to the posts slice
 	for _, post := range data.Posts {
 		if validateContent(post.Content) != nil {
-			return nil, err
+			return err
 		}
 		if validateTitle(post.Title) != nil {
-			return nil, err
+			return err
 		}
 		if validateAuthor(post.Author) != nil {
-			return nil, err
+			return err
 		}
-		authorPosts[post.Author] = append(authorPosts[post.Author], post)
+		// If the author is not in the map, add it
+		if _, ok := p.Posts[post.Author]; !ok {
+			p.Posts[post.Author] = make(map[int]Post)
+		}
+		// Add to the map with the ID as the key
+		p.Posts[post.Author][post.ID] = post
 	}
-	return authorPosts, nil
+	return nil
 }
 
 // isCapitalizedProperly checks if the title follows the capitalization rules.
@@ -245,7 +220,7 @@ func validateAuthor(author string) error {
 }
 
 // CreatePosts creates a new blogpost
-func (p *Persistence) CreatePosts(post Post) error {
+func (p *PostService) CreatePosts(post Post) error {
 	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -272,21 +247,23 @@ func (p *Persistence) CreatePosts(post Post) error {
 	// Increment the lastID
 	p.LastID = post.ID
 
-	// Add the post to the posts slice
-	p.Posts[post.Author] = append(p.Posts[post.Author], post)
+	// Add the post
+	p.Posts[post.Author][post.ID] = post
+
 	return nil
 }
 
 // Get all posts for the author
-func (p *Persistence) GetAllPosts(author string) ([]*Post, error) {
+func (p *PostService) GetAllPosts(author string) ([]*Post, error) {
 	// Create a slice of pointers to the posts
 	var postPointers []*Post
 
 	// If admin is the author, return all posts
 	if author == "admin" {
 		for _, posts := range p.Posts {
-			for i := range posts {
-				postPointers = append(postPointers, &posts[i])
+			// Add all posts to the postPointers slice
+			for _, p := range posts {
+				postPointers = append(postPointers, &p)
 			}
 		}
 		// Order the posts by ID
@@ -298,32 +275,32 @@ func (p *Persistence) GetAllPosts(author string) ([]*Post, error) {
 
 	// If the author is not admin, return only the posts for that author
 	posts := p.Posts[author]
-	for i := range posts {
-		postPointers[i] = &posts[i]
+	for _, p := range posts {
+		postPointers = append(postPointers, &p)
 	}
 
 	return postPointers, nil
 }
 
 // GetPosts gets a blogpost by id
-func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
+func (p *PostService) GetPosts(id int, author string) (*Post, error) {
 	// If admin is the author, return all posts
 	if author == "admin" {
 		for _, posts := range p.Posts {
-			for i := range posts {
+			for _, p := range posts {
 				// Make sure the post belongs to the author
-				if posts[i].ID == id {
-					return &posts[i], nil
+				if p.ID == id {
+					return &p, nil
 				}
 			}
 		}
 	}
 	// If the author is not admin, return only the posts for that author
 	posts := p.Posts[author]
-	for i := range posts {
+	for _, p := range posts {
 		// Make sure the post belongs to the author
-		if posts[i].ID == id && posts[i].Author == author {
-			return &posts[i], nil
+		if p.ID == id && p.Author == author {
+			return &p, nil
 		}
 	}
 
@@ -331,7 +308,7 @@ func (p *Persistence) GetPosts(id int, author string) (*Post, error) {
 }
 
 // UpdatePosts updates a blogpost
-func (p *Persistence) UpdatePosts(post Post, author string) error {
+func (p *PostService) UpdatePosts(post Post, author string) error {
 	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -374,29 +351,18 @@ func (p *Persistence) UpdatePosts(post Post, author string) error {
 }
 
 // DeletePosts deletes a blogpost
-func (p *Persistence) DeletePosts(id int, author string) error {
+func (p *PostService) DeletePosts(id int, author string) error {
 	// Delete the post from the posts slice
 	// If admin is the author, delete any posts
 	if author == "admin" {
-		for authorKey, posts := range p.Posts {
-			for i, post := range posts {
-				if post.ID == id {
-					// Delete the post from the posts slice when the ID matches
-					p.Posts[authorKey] = append(posts[:i], posts[i+1:]...)
-					return nil
-				}
-			}
+		for authorKey := range p.Posts {
+			delete(p.Posts[authorKey], id)
+			return nil
 		}
 	} else {
 		// If the author is not admin, delete only the posts for that author
-		posts := p.Posts[author]
-		for i, post := range posts {
-			if post.ID == id && post.Author == author {
-				// Delete the post from the posts slice
-				p.Posts[author] = append(posts[:i], posts[i+1:]...)
-				return nil
-			}
-		}
+		delete(p.Posts[author], id)
+
 	}
 	return ErrPostNotFound
 }

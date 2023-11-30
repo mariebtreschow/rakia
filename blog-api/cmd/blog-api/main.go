@@ -29,10 +29,12 @@ func main() {
 	logger := server.NewLogger()
 
 	// Initialize the author posts map
-	p := make(internal.AuthorPostsMap)
+	// This is a map of author names to a map of post IDs to posts
+	p := make(map[string]map[int]internal.Post)
+	p["Author 1"] = make(map[int]internal.Post)
 
 	// Create new blog posts service
-	posts, err := internal.NewPersistance(&p, logger)
+	posts, err := internal.NewPostsService(&p, logger)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("error creating blog posts service")
 	}
