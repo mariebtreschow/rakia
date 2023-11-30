@@ -19,7 +19,7 @@ type MockPostsService struct {
 	mock.Mock
 }
 
-func (m *MockPostsService) CreatePosts(post internal.Post) error {
+func (m *MockPostsService) CreatePosts(post internal.Post, author string) error {
 	args := m.Called(post)
 	return args.Error(0)
 }
@@ -34,7 +34,7 @@ func (m *MockPostsService) UpdatePosts(post internal.Post, author string) error 
 	return args.Error(0)
 }
 
-func (m *MockPostsService) GetPosts(id int, author string) (*internal.Post, error) {
+func (m *MockPostsService) GetPostByID(id int, author string) (*internal.Post, error) {
 	args := m.Called(id, author)
 	return args.Get(0).(*internal.Post), args.Error(1)
 }
@@ -144,7 +144,7 @@ func TestCreatePostsHandler(t *testing.T) {
 
 	// Create a mock instance of the PostsService
 	mockPostsService := new(MockPostsService)
-	mockPostsService.On("CreatePosts", testPostCreate).Return(nil)
+	mockPostsService.On("CreatePosts", testPostCreate, "Author 1").Return(nil)
 
 	// Create an instance of the Server with the mock service
 	server := &Server{PostsService: mockPostsService}

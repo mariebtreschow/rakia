@@ -29,6 +29,8 @@ var (
 	ErrTitleSpammy            = fmt.Errorf("title must not contain spammy patterns or phrases")
 	ErrTitleCapitalization    = fmt.Errorf("title must follow capitalization rules")
 	ErrContentConsecutiveChar = fmt.Errorf("content must not have excessive consecutive identical characters")
+	ErrAuthorNotFound         = fmt.Errorf("author not found")
+	ErrAuthorNameInvalid      = fmt.Errorf("author name must not be longer than 70 characters or shorter than 2 characters")
 )
 
 type Post struct {
@@ -101,6 +103,8 @@ func (p *PostService) Seed() error {
 		// Add to the map with the ID as the key
 		p.Posts[post.Author][post.ID] = post
 	}
+	// Update the lastID
+	p.LastID = len(data.Posts)
 	return nil
 }
 
@@ -216,15 +220,29 @@ func validateAuthor(author string) error {
 	if author == "" {
 		return ErrAuthorEmpty
 	}
+	if len(author) > 70 || len(author) < 2 {
+		return ErrAuthorNameInvalid
+	}
 	return nil
 }
 
 // CreatePosts creates a new blogpost
-func (p *PostService) CreatePosts(post Post) error {
+func (p *PostService) CreatePosts(post Post, author string) error {
 	// mutex.Lock() and mutex.Unlock() ensure that only one goroutine can access the map at a time
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
+	// If admin is the author, add any posts for any author
+	if author == "admin" {
+		if _, ok := p.Posts[post.Author]; !ok {
+			p.Posts[post.Author] = make(map[int]Post)
+		}
+	} else {
+		// Make sure the author is in the map
+		if _, ok := p.Posts[post.Author]; !ok {
+			return ErrAuthorNotFound
+		}
+	}
 	// Check if the title is unique for the author
 	for _, existingPost := range p.Posts[post.Author] {
 		if existingPost.Title == post.Title {
@@ -244,7 +262,7 @@ func (p *PostService) CreatePosts(post Post) error {
 	}
 	// Add ID, must be unique
 	post.ID = p.LastID + 1
-	// Increment the lastID
+	// Increment the lastID, so the next post will have a unique ID
 	p.LastID = post.ID
 
 	// Add the post
@@ -256,54 +274,66 @@ func (p *PostService) CreatePosts(post Post) error {
 // Get all posts for the author
 func (p *PostService) GetAllPosts(author string) ([]*Post, error) {
 	// Create a slice of pointers to the posts
-	var postPointers []*Post
+	var result []*Post
 
 	// If admin is the author, return all posts
 	if author == "admin" {
 		for _, posts := range p.Posts {
 			// Add all posts to the postPointers slice
-			for _, p := range posts {
-				postPointers = append(postPointers, &p)
+			for id := range posts {
+				p := posts[id]
+				result = append(result, &p)
 			}
 		}
 		// Order the posts by ID
-		sort.Slice(postPointers, func(i, j int) bool {
-			return postPointers[i].ID < postPointers[j].ID
+		sort.Slice(result, func(i, j int) bool {
+			return result[i].ID < result[j].ID
 		})
-		return postPointers, nil
+		return result, nil
+	}
+
+	// Make sure the author is in the map
+	posts, ok := p.Posts[author]
+	if !ok {
+		return nil, ErrAuthorNotFound
 	}
 
 	// If the author is not admin, return only the posts for that author
-	posts := p.Posts[author]
-	for _, p := range posts {
-		postPointers = append(postPointers, &p)
+	for id := range posts {
+		p := posts[id]
+		result = append(result, &p)
 	}
 
-	return postPointers, nil
+	return result, nil
 }
 
 // GetPosts gets a blogpost by id
-func (p *PostService) GetPosts(id int, author string) (*Post, error) {
+func (p *PostService) GetPostByID(id int, author string) (*Post, error) {
 	// If admin is the author, return all posts
 	if author == "admin" {
-		for _, posts := range p.Posts {
-			for _, p := range posts {
-				// Make sure the post belongs to the author
-				if p.ID == id {
-					return &p, nil
-				}
+		// If admin is the author, return any posts of id that exists
+		for _, authorPosts := range p.Posts {
+			if post, exists := authorPosts[id]; exists {
+				result := post
+				return &result, nil
 			}
 		}
-	}
-	// If the author is not admin, return only the posts for that author
-	posts := p.Posts[author]
-	for _, p := range posts {
-		// Make sure the post belongs to the author
-		if p.ID == id && p.Author == author {
-			return &p, nil
+
+	} else {
+		// Make sure the author is in the map
+		posts, ok := p.Posts[author]
+		if !ok {
+			return nil, ErrAuthorNotFound
+		}
+
+		// Get the post with the matching ID and that it exists
+		if post, ok := posts[id]; ok {
+			result := &post
+			return result, nil
 		}
 	}
 
+	// If the post is not found, return ErrPostNotFound
 	return nil, ErrPostNotFound
 }
 
@@ -326,24 +356,29 @@ func (p *PostService) UpdatePosts(post Post, author string) error {
 
 	// If admin is the author, update any posts
 	if author == "admin" {
-		for authorKey, posts := range p.Posts {
-			for i, existingPost := range posts {
-				if existingPost.ID == post.ID {
-					posts[i] = post
-					p.Posts[authorKey] = posts
-					return nil
-				}
+		// Update any post if ID exists
+		for _, posts := range p.Posts {
+			if _, ok := posts[post.ID]; ok {
+				posts[post.ID] = post
+				return nil
 			}
 		}
 	} else {
+		// Make sure the author is in the map
+		if _, ok := p.Posts[post.Author]; !ok {
+			return ErrAuthorNotFound
+		}
 		// If the author is not admin, update only the posts for that author
 		posts := p.Posts[post.Author]
-		for i, existingPost := range posts {
-			if existingPost.ID == post.ID && existingPost.Author == post.Author {
-				posts[i] = post
-				p.Posts[post.Author] = posts
-				return nil
-			}
+
+		// make sure the post exists
+		if _, ok := posts[post.ID]; !ok {
+			return ErrPostNotFound
+		}
+
+		// Update the post if the author matches
+		if posts[post.ID].Author == author {
+			posts[post.ID] = post
 		}
 
 	}
@@ -355,13 +390,20 @@ func (p *PostService) DeletePosts(id int, author string) error {
 	// Delete the post from the posts slice
 	// If admin is the author, delete any posts
 	if author == "admin" {
-		for authorKey := range p.Posts {
-			delete(p.Posts[authorKey], id)
-			return nil
+		for _, posts := range p.Posts {
+			if _, ok := posts[id]; ok {
+				delete(posts, id)
+				return nil
+			}
 		}
 	} else {
 		// If the author is not admin, delete only the posts for that author
-		delete(p.Posts[author], id)
+		if posts, ok := p.Posts[author]; ok {
+			if _, ok := posts[id]; ok {
+				delete(posts, id)
+				return nil
+			}
+		}
 
 	}
 	return ErrPostNotFound

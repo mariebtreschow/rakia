@@ -48,3 +48,22 @@ func TestValidateContent(t *testing.T) {
 		assert.Equal(t, tc.want, got)
 	}
 }
+
+func TestValidateAuthor(t *testing.T) {
+
+	cases := []struct {
+		author string
+		want   error
+		test   string
+	}{
+		{"Author 1", nil, "valid author"},
+		{"", ErrAuthorEmpty, "empty author"},
+		{"M", ErrAuthorNameInvalid, "author too short"},
+	}
+
+	for _, tc := range cases {
+		got := validateAuthor(tc.author)
+		assert.Equal(t, tc.want, got)
+	}
+
+}

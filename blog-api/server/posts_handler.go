@@ -44,6 +44,11 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 		// Get all posts for the author
 		posts, err := s.PostsService.GetAllPosts(author)
 		if err != nil {
+			if err == internal.ErrAuthorNotFound {
+				s.Logger.Error().Err(err).Msg("author not found")
+				writeJSONError(w, "author not found", http.StatusNotFound)
+				return
+			}
 			s.Logger.Error().Err(err).Msg("error getting posts")
 			writeJSONError(w, "error getting posts", http.StatusInternalServerError)
 			return
@@ -100,11 +105,11 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 		}
 
 		// Get the post
-		post, err := s.PostsService.GetPosts(postID, author)
+		post, err := s.PostsService.GetPostByID(postID, author)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error getting post")
-			if err == internal.ErrPostNotFound {
-				writeJSONError(w, "post not found", http.StatusNotFound)
+			if err == internal.ErrPostNotFound || err == internal.ErrAuthorNotFound {
+				writeJSONError(w, err.Error(), http.StatusNotFound)
 				return
 			}
 			writeJSONError(w, "error getting post", http.StatusInternalServerError)
@@ -168,11 +173,11 @@ func (s *Server) CreatePostsHandler() http.HandlerFunc {
 		}
 
 		// Save the post
-		err = s.PostsService.CreatePosts(post)
+		err = s.PostsService.CreatePosts(post, author)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error creating post")
 			// Handle validation errors
-			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars {
+			if err == internal.ErrUniqueTitle || err == internal.ErrTitleEmpty || err == internal.ErrTitleInvalid || err == internal.ErrContentEmpty || err == internal.ErrContentInvalid || err == internal.ErrAuthorEmpty || err == internal.ErrContentEncoding || err == internal.ErrTitleInvalidChars || err == internal.ErrTitleSpammy || err == internal.ErrTitleCapitalization || err == internal.ErrAuthorNameInvalid {
 				writeJSONError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
