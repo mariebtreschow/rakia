@@ -81,26 +81,33 @@ func (D *Decoder) decode(digits string, index int, currentLetter string, result 
 	return nil
 }
 
-func (D *Decoder) FindAllCombinations(digits string) (int, error) {
-	// Adding timer to see how long it took
+func (D *Decoder) FindAllCombinations(digits string) (*int, error) {
+	// Make sure the input is valid digits
+	_, err := strconv.Atoi(digits)
+	if err != nil {
+		return nil, fmt.Errorf("digits is not a valid integer")
+	}
+	// Not valid
+	if digits == "0" {
+		return nil, fmt.Errorf("digits is 0, always return 0")
+	}
+
+	// Add a timer to see how long it takes
 	start := time.Now()
 
 	var result []string
-	if digits == "0" {
-		// Not valid
-		fmt.Println("digits is 0, always return 0")
-		result = append(result, "0")
-		return len(result), nil
-	}
-	err := D.decode(digits, 0, "", &result)
+	err = D.decode(digits, 0, "", &result)
 	if err != nil {
-		return len(result), err
+		numberOfCombinations := len(result)
+		return &numberOfCombinations, err
 	}
 	// Print the result
 	fmt.Println("possible combinations:", result)
 	// Print the time it took
 	fmt.Println("time it took:", time.Since(start))
-	return len(result), nil
+	// Return the number of combinations
+	numberOfCombinations := len(result)
+	return &numberOfCombinations, nil
 }
 
 func NewDecoder() *Decoder {

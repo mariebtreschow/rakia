@@ -13,7 +13,7 @@ func TestDecode(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if result != 1 {
+		if *result != 1 {
 			t.Errorf("expected 1 result, got %d", result)
 		}
 
@@ -24,7 +24,7 @@ func TestDecode(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if result != 2 {
+		if *result != 2 {
 			t.Errorf("expected 2 results, got %d", result)
 		}
 	})
@@ -34,7 +34,7 @@ func TestDecode(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if result != 3 {
+		if *result != 3 {
 			t.Errorf("expected 3 results, got %d", result)
 		}
 	})
@@ -44,7 +44,7 @@ func TestDecode(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if result != 3 {
+		if *result != 3 {
 			t.Errorf("expected 3 results, got %d", result)
 		}
 	})
