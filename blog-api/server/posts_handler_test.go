@@ -93,7 +93,7 @@ func TestGetAllPostsHandler(t *testing.T) {
 
 	// Record the response using httptest
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.GetAllPostsHandler())
+	handler := server.GetAllPostsHandler()
 
 	// Call the handler
 	handler.ServeHTTP(rr, req)
@@ -131,7 +131,7 @@ func TestGetPostsHandler(t *testing.T) {
 
 	// Record the response using httptest
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.GetPostsHandler())
+	handler := server.GetPostsHandler()
 
 	// Call the handler
 	handler.ServeHTTP(rr, req)
@@ -170,7 +170,7 @@ func TestCreatePostsHandler(t *testing.T) {
 
 	// Record the response using httptest
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.CreatePostsHandler())
+	handler := server.CreatePostsHandler()
 
 	// Call the handler
 	handler.ServeHTTP(rr, req)
@@ -207,7 +207,7 @@ func TestUpdatePostsHandler(t *testing.T) {
 
 	// Record the response using httptest
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.UpdatePostsHandler())
+	handler := server.UpdatePostsHandler()
 
 	// Call the handler
 	handler.ServeHTTP(rr, req)
@@ -240,13 +240,31 @@ func TestDeletePostsHandler(t *testing.T) {
 
 	// Record the response using httptest
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.DeletePostsHandler())
+	handler := server.DeletePostsHandler()
 
 	// Call the handler
 	handler.ServeHTTP(rr, req)
 
 	// Check the status code
 	assert.Equal(t, http.StatusAccepted, rr.Code)
+}
+
+func TestGetPostNotDeletedPostFoundHandler(t *testing.T) {
+	mockPostsService := new(MockPostsService)
+	mockPostsService.On("GetPostByID", 1, "Author 1").Return(&internal.Post{}, internal.ErrPostNotFound)
+	server := &Server{PostsService: mockPostsService, Logger: &logger}
+
+	req, _ := http.NewRequest("GET", "/api/posts/1", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "1"})
+	ctx := context.WithValue(req.Context(), ContextAuthor, "Author 1")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	handler := server.GetPostsHandler()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
 }
 
 func TestGetPostNotFoundHandler(t *testing.T) {
@@ -260,11 +278,11 @@ func TestGetPostNotFoundHandler(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.GetPostsHandler())
+	handler := server.GetPostsHandler()
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusNotFound, rr.Code) // Assuming you return 404 for not found
+	assert.Equal(t, http.StatusNotFound, rr.Code)
 }
 
 func TestUpdateInvalidPostsHandler(t *testing.T) {
@@ -287,11 +305,11 @@ func TestUpdateInvalidPostsHandler(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.UpdatePostsHandler())
+	handler := server.UpdatePostsHandler()
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code) // Assuming you return 400 for bad requests
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
 func TestCreateInvalidPostsHandler(t *testing.T) {
@@ -312,9 +330,9 @@ func TestCreateInvalidPostsHandler(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(server.CreatePostsHandler())
+	handler := server.CreatePostsHandler()
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code) // Assuming you return 400 for bad requests
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
