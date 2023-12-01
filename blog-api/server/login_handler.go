@@ -9,7 +9,7 @@ import (
 	"rakia.ai/blog-api/v2/internal"
 )
 
-// JWT Secret Key (should be kept secret and preferably not hardcoded, this is just for demo purposes)
+// JWT Secret Key (should be kept secret and not hardcoded, this is just for demo purposes)
 var jwtKey = []byte("my_secret_key")
 
 // JWT Expiration Time (30 minutes)

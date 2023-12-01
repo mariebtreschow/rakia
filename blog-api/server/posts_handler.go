@@ -115,6 +115,7 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 			writeJSONError(w, "error getting post", http.StatusInternalServerError)
 			return
 		}
+
 		if post == nil {
 			s.Logger.Error().Msg("post not found")
 			writeJSONError(w, "post not found", http.StatusNotFound)
