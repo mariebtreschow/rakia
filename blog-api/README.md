@@ -74,9 +74,9 @@ DELETE /api/posts/{id}: Delete a specific post.
 ### Request
 Send a POST request to the /login endpoint with the author's credentials or Admin use that can access all posts:
 
-`{"username": "admin", "password": "admin"}`
+`{"author": "admin", "password": "admin"}`
 
-`{"username": "Author 1", "password": "password1"}`
+`{"author": "Author 1", "password": "password1"}`
 
 ### Response
 Upon successful authentication, the server responds with a JWT in the response body:
