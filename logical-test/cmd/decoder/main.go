@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // Decoder takes an integer and returns the corresponding letter in the alphabet
@@ -12,15 +13,14 @@ import (
 // 1 -> A
 // 12 -> AB, L
 // 226 -> BBF, BZ, VF
-// 2269 -> BBFI, BZI, VFI, VZ
+// 2269 -> BBFI, BZI, VFI
 // If the integer is less than 1 or greater than 26, an error is returned.
 
 type Decoder struct {
-	LetterMap map[string]string
 }
 
 func (D *Decoder) digitToLetter(digit string) (string, error) {
-	fmt.Println("digit being converted to letter:", digit)
+	// Convert the digit to an integer
 	num, err := strconv.Atoi(digit)
 	if err != nil {
 		return "", err
@@ -28,22 +28,11 @@ func (D *Decoder) digitToLetter(digit string) (string, error) {
 	if num < 1 || num > 26 {
 		return "", fmt.Errorf("number out of range")
 	}
-	// If the letter is already in the map, return it
-	if _, ok := D.LetterMap[digit]; ok {
-		return D.LetterMap[digit], nil
-	}
-	// 'A' is 65 in ASCII, so we add n-1 to it to get the correct letter
-	letter := string(rune('A' + num - 1))
-
-	// Add the letter to the map
-	D.LetterMap[digit] = letter
-
-	return letter, nil
+	// Convert the integer to a letter
+	return string(rune('A' + num - 1)), nil
 }
 
 func (D *Decoder) decode(digits string, index int, currentLetter string, result *[]string) error {
-	fmt.Println("current letter being decoded:", currentLetter)
-
 	// If index is equal to the length of the digits, we have reached the end of the string
 	// And can append the current letter to the result
 	if index == len(digits) {
@@ -93,6 +82,9 @@ func (D *Decoder) decode(digits string, index int, currentLetter string, result 
 }
 
 func (D *Decoder) FindAllCombinations(digits string) (int, error) {
+	// Adding timer to see how long it took
+	start := time.Now()
+
 	var result []string
 	if digits == "0" {
 		// Not valid
@@ -106,6 +98,8 @@ func (D *Decoder) FindAllCombinations(digits string) (int, error) {
 	}
 	// Print the result
 	fmt.Println("possible combinations:", result)
+	// Print the time it took
+	fmt.Println("time it took:", time.Since(start))
 	return len(result), nil
 }
 
@@ -119,7 +113,6 @@ func main() {
 	flag.Parse()
 
 	d := NewDecoder()
-	d.LetterMap = make(map[string]string)
 
 	result, err := d.FindAllCombinations(*digits)
 	if err != nil {
