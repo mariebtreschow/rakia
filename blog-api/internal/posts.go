@@ -322,33 +322,19 @@ func (p *PostService) UpdatePosts(post Post, author string) error {
 	}
 
 	// If admin is the author, update any posts
-	if author == "admin" {
-		// Update any post if ID exists
-		for _, posts := range p.Posts {
-			if _, ok := posts[post.ID]; ok {
-				posts[post.ID] = post
-				return nil
+
+	// Update any post if ID exists
+	for _, posts := range p.Posts {
+		if _, ok := posts[post.ID]; ok {
+			// If the author in the request matches the author in token
+			if posts[post.ID].Author != author && author != "admin" {
+				return ErrAuthorNotAllowed
 			}
-		}
-	} else {
-		// Make sure the author is in the map
-		if _, ok := p.Posts[post.Author]; !ok {
-			return ErrAuthorNotFound
-		}
-		// If the author is not admin, update only the posts for that author
-		posts := p.Posts[post.Author]
-
-		// make sure the post exists
-		if _, ok := posts[post.ID]; !ok {
-			return ErrPostNotFound
-		}
-
-		// Update the post if the author matches
-		if posts[post.ID].Author == author {
 			posts[post.ID] = post
+			return nil
 		}
-
 	}
+
 	return nil
 }
 

@@ -269,14 +269,16 @@ func (s *Server) UpdatePostsHandler() http.HandlerFunc {
 				internal.ErrAuthorNameInvalid:
 				writeJSONError(w, err.Error(), http.StatusBadRequest)
 				return
-			}
-			if err == internal.ErrPostNotFound {
-				s.Logger.Error().Err(err).Msg("post not found")
-				writeJSONError(w, "post not found", http.StatusNotFound)
+			case internal.ErrPostNotFound:
+				writeJSONError(w, err.Error(), http.StatusNotFound)
+				return
+			case internal.ErrAuthorNotAllowed:
+				writeJSONError(w, err.Error(), http.StatusForbidden)
+				return
+			default:
+				writeJSONError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			writeJSONError(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
 
 		// Status accepted
@@ -315,18 +317,20 @@ func (s *Server) DeletePostsHandler() http.HandlerFunc {
 		// Delete the post
 		err = s.PostsService.DeletePosts(postID, author)
 		if err != nil {
-			if err == internal.ErrPostNotFound {
+			switch err {
+			case internal.ErrPostNotFound:
 				s.Logger.Error().Err(err).Msg("post not found")
 				writeJSONError(w, err.Error(), http.StatusNotFound)
 				return
-			} else if err == internal.ErrAuthorNotAllowed {
+			case internal.ErrAuthorNotAllowed:
 				s.Logger.Error().Err(err).Msg("not allowed to delete post")
 				writeJSONError(w, err.Error(), http.StatusForbidden)
 				return
+			default:
+				s.Logger.Error().Err(err).Msg("error deleting post")
+				writeJSONError(w, "error deleting post", http.StatusInternalServerError)
+				return
 			}
-			s.Logger.Error().Err(err).Msg("error deleting post")
-			writeJSONError(w, "error deleting post", http.StatusInternalServerError)
-			return
 		}
 
 		// Status accepted
