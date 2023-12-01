@@ -33,16 +33,9 @@ type PostResponse struct {
 // GetAllPostsHandler gets all posts
 func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the context from the request
-		author, ok := r.Context().Value(ContextAuthor).(string)
-		if !ok {
-			s.Logger.Error().Msg("error getting author from context")
-			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
-			return
-		}
 
 		// Get all posts for the author
-		posts, err := s.PostsService.GetAllPosts(author)
+		posts, err := s.PostsService.GetAllPosts()
 		if err != nil {
 			if err == internal.ErrAuthorNotFound {
 				s.Logger.Error().Err(err).Msg("author not found")
@@ -80,14 +73,6 @@ func (s *Server) GetAllPostsHandler() http.HandlerFunc {
 // GetPostsHandler gets a post
 func (s *Server) GetPostsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the context from the request
-		author, ok := r.Context().Value(ContextAuthor).(string)
-		if !ok {
-			s.Logger.Error().Msg("error getting author from context")
-			writeJSONError(w, ErrInvalidRequest, http.StatusBadRequest)
-			return
-		}
-
 		// Get the post ID from the URL
 		id, ok := mux.Vars(r)["id"]
 		if !ok {
@@ -105,7 +90,7 @@ func (s *Server) GetPostsHandler() http.HandlerFunc {
 		}
 
 		// Get the post
-		post, err := s.PostsService.GetPostByID(postID, author)
+		post, err := s.PostsService.GetPostByID(postID)
 		if err != nil {
 			s.Logger.Error().Err(err).Msg("error getting post")
 			if err == internal.ErrPostNotFound || err == internal.ErrAuthorNotFound {
@@ -332,7 +317,11 @@ func (s *Server) DeletePostsHandler() http.HandlerFunc {
 		if err != nil {
 			if err == internal.ErrPostNotFound {
 				s.Logger.Error().Err(err).Msg("post not found")
-				writeJSONError(w, "post not found", http.StatusNotFound)
+				writeJSONError(w, err.Error(), http.StatusNotFound)
+				return
+			} else if err == internal.ErrAuthorNotAllowed {
+				s.Logger.Error().Err(err).Msg("not allowed to delete post")
+				writeJSONError(w, err.Error(), http.StatusForbidden)
 				return
 			}
 			s.Logger.Error().Err(err).Msg("error deleting post")

@@ -31,6 +31,7 @@ var (
 	ErrContentConsecutiveChar = fmt.Errorf("content must not have excessive consecutive identical characters")
 	ErrAuthorNotFound         = fmt.Errorf("author not found")
 	ErrAuthorNameInvalid      = fmt.Errorf("author name must not be longer than 70 characters or shorter than 2 characters")
+	ErrAuthorNotAllowed       = fmt.Errorf("not allowed to update posts for another author")
 )
 
 type Post struct {
@@ -272,67 +273,33 @@ func (p *PostService) CreatePosts(post Post, author string) error {
 }
 
 // Get all posts for the author
-func (p *PostService) GetAllPosts(author string) ([]*Post, error) {
+func (p *PostService) GetAllPosts() ([]*Post, error) {
 	// Create a slice of pointers to the posts
 	var result []*Post
 
-	// If admin is the author, return all posts
-	if author == "admin" {
-		for _, posts := range p.Posts {
-			// Add all posts to the postPointers slice
-			for id := range posts {
-				p := posts[id]
-				result = append(result, &p)
-			}
+	for _, posts := range p.Posts {
+		// Add all posts to the postPointers slice
+		for id := range posts {
+			p := posts[id]
+			result = append(result, &p)
 		}
-		// Order the posts by ID
-		sort.Slice(result, func(i, j int) bool {
-			return result[i].ID < result[j].ID
-		})
-		return result, nil
 	}
-
-	// Make sure the author is in the map
-	posts, ok := p.Posts[author]
-	if !ok {
-		return nil, ErrAuthorNotFound
-	}
-
-	// If the author is not admin, return only the posts for that author
-	for id := range posts {
-		p := posts[id]
-		result = append(result, &p)
-	}
-
+	// Order the posts by ID
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
 	return result, nil
 }
 
 // GetPosts gets a blogpost by id
-func (p *PostService) GetPostByID(id int, author string) (*Post, error) {
-	// If admin is the author, return all posts
-	if author == "admin" {
-		// If admin is the author, return any posts of id that exists
-		for _, authorPosts := range p.Posts {
-			if post, exists := authorPosts[id]; exists {
-				result := post
-				return &result, nil
-			}
-		}
-
-	} else {
-		// Make sure the author is in the map
-		posts, ok := p.Posts[author]
-		if !ok {
-			return nil, ErrAuthorNotFound
-		}
-
-		// Get the post with the matching ID and that it exists
-		if post, ok := posts[id]; ok {
-			result := &post
-			return result, nil
+func (p *PostService) GetPostByID(id int) (*Post, error) {
+	// Return post by ID, from any author
+	for _, authorPosts := range p.Posts {
+		if post, exists := authorPosts[id]; exists {
+			result := post
+			return &result, nil
 		}
 	}
-
 	// If the post is not found, return ErrPostNotFound
 	return nil, ErrPostNotFound
 }
@@ -391,23 +358,15 @@ func (p *PostService) DeletePosts(id int, author string) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	// If admin is the author, delete any posts
-	if author == "admin" {
-		for _, posts := range p.Posts {
-			if _, ok := posts[id]; ok {
-				delete(posts, id)
-				return nil
+	for _, posts := range p.Posts {
+		if _, ok := posts[id]; ok {
+			if posts[id].Author != author && author != "admin" {
+				return ErrAuthorNotAllowed
 			}
+			delete(posts, id)
+			return nil
 		}
-	} else {
-		// If the author is not admin, delete only the posts for that author
-		if posts, ok := p.Posts[author]; ok {
-			if _, ok := posts[id]; ok {
-				delete(posts, id)
-				return nil
-			}
-		}
-
 	}
+
 	return ErrPostNotFound
 }
